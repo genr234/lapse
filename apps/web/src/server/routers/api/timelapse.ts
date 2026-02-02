@@ -311,7 +311,12 @@ export default router({
         }),
 
     createDraft: protectedProcedure("POST", "/timelapse/createDraft")
-        .summary("Creates a draft timelapse. Draft timelapses can be commited and turned into regular timelapses by calling `timelapse.commit`. Before a draft timelapse is commited, all AES-256-CBC encrypted data must be uploaded to the server using both the `videoToken` and the `thumbnailToken` via `/api/upload`. The key or IV that the data is encrypted should be derived from the device passkey and timelapse ID. Other key/IV values will make the server unable to decrypt the timelapse.")
+        .summary(`
+            Creates a draft timelapse. Draft timelapses can be commited and turned into regular timelapses by calling "timelapse.commit".
+            Before a draft timelapse is commited, all AES-256-CBC encrypted data must be uploaded to the server using both the "videoToken"
+            and the "thumbnailToken" via "/api/upload". The key or IV that the data is encrypted should be derived from the device passkey
+            and timelapse ID. Other key/IV values will make the server unable to decrypt the timelapse.
+        `)
         .input(z.object({
             containerType: TimelapseVideoContainerSchema
                 .describe("The container format of the video stream. This will be used to derive the MIME type of the video.")
