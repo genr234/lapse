@@ -19,10 +19,8 @@ export const HackatimeProjectSchema = z.object({
 });
 
 export default router({
-    /**
-     * Gets all Hackatime projects from the user's Hackatime account.
-     */
     allProjects: protectedProcedure()
+        .summary("Gets all Hackatime projects from the user's Hackatime account.")
         .input(z.object({}))
         .output(apiResult({
             projects: z.array(HackatimeProjectSchema)
