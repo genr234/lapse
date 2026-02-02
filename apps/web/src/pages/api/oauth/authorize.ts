@@ -82,7 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!redirectUri)
             return res.status(400).json({ ok: false, message: "Redirect URI required." });
 
-        if (client.redirectUris.length > 0 && !client.redirectUris.includes(redirectUri))
+        if (client.redirectUris.length === 0 || !client.redirectUris.includes(redirectUri))
             return res.status(400).json({ ok: false, message: "Invalid redirect URI." });
 
         const existingGrant = await database.serviceGrant.findFirst({
@@ -162,7 +162,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!redirectUri)
             return res.status(400).json({ ok: false, message: "Redirect URI required." });
 
-        if (client.redirectUris.length > 0 && !client.redirectUris.includes(redirectUri))
+        if (client.redirectUris.length === 0 || !client.redirectUris.includes(redirectUri))
             return res.status(400).json({ ok: false, message: "Invalid redirect URI." });
 
         if (!parsed.data.consent) {
