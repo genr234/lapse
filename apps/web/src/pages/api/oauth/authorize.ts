@@ -33,17 +33,19 @@ function getInvalidScopes(scopes: string[]) {
     return scopes.filter(scope => !allowed.has(scope));
 }
 
-function buildRedirectUrl(redirectUri: string | null, query: Record<string, string | undefined>) {
+function buildRedirectUrl(redirectUri: string | null, fragment: Record<string, string | undefined>) {
     if (!redirectUri)
         return null;
 
     const url = new URL(redirectUri);
+    const params = new URLSearchParams();
 
-    for (const [key, value] of Object.entries(query)) {
+    for (const [key, value] of Object.entries(fragment)) {
         if (value !== undefined)
-            url.searchParams.set(key, value);
+            params.set(key, value);
     }
 
+    url.hash = params.toString();
     return url.toString();
 }
 
