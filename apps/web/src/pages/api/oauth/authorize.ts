@@ -21,9 +21,9 @@ const ConsentSchema = z.object({
     consent: z.boolean()
 });
 
-function normalizeScopes(input: string[] | undefined) {
+function normalizeScopes(input: string[] | undefined): string[] {
     if (!input)
-        return [] as string[];
+        return [];
 
     return input.map(scope => scope.trim()).filter(Boolean);
 }
@@ -171,7 +171,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
             return res.status(200).json({ ok: true, data: { redirectUrl: denyRedirect } });
         }
-
 
         const allowedScopes = client.scopes;
         const requestedScopes = getRequestedScopes(scopes, allowedScopes);

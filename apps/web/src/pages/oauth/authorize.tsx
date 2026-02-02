@@ -36,9 +36,7 @@ export default function OAuthAuthorize() {
   const [scopes, setScopes] = useState<string[]>([]);
   const [typedName, setTypedName] = useState("");
   const [requestedScopes, setRequestedScopes] = useState<string[]>([]);
-  const [trustLevel, setTrustLevel] = useState<"TRUSTED" | "UNTRUSTED" | null>(
-    null,
-  );
+  const [trustLevel, setTrustLevel] = useState<"TRUSTED" | "UNTRUSTED" | null>(null);
   const [extraScope, setExtraScope] = useState(
     EXTRA_IMPORTANT_SCOPES[
       Math.floor(Math.random() * EXTRA_IMPORTANT_SCOPES.length)
@@ -46,16 +44,14 @@ export default function OAuthAuthorize() {
   );
 
   const { client_id, scope, redirect_uri, state } = router.query;
-  const resolvedRedirectUri =
-    typeof redirect_uri === "string" ? redirect_uri : undefined;
+  const resolvedRedirectUri = typeof redirect_uri === "string" ? redirect_uri : undefined;
 
   useEffect(() => {
-    if (!router.isReady) return;
+    if (!router.isReady)
+      return;
 
     if (!auth.currentUser && !auth.isLoading) {
-      router.push(
-        `/auth?error=oauth-login-required&redirect=${encodeURIComponent(router.asPath)}`,
-      );
+      router.push(`/auth?error=oauth-login-required&redirect=${encodeURIComponent(router.asPath)}`);
       return;
     }
 
@@ -99,7 +95,8 @@ export default function OAuthAuthorize() {
         setTrustLevel(data.data.client.trustLevel ?? null);
         setIsLoading(false);
         setError(null);
-      } catch (err) {
+      }
+      catch (err) {
         console.error("(oauth/authorize) failed to load service", err);
         setError("Unable to validate the service.");
         setIsLoading(false);
@@ -122,31 +119,26 @@ export default function OAuthAuthorize() {
   const groupedScopes = useMemo(() => {
     const active: Record<string, { scope: string; description: string }[]> = {};
 
-    for (const [groupName, groupScopes] of Object.entries(
-      OAUTH_SCOPE_GROUPS,
-    ) as [string, Record<string, string>][]) {
+    for (const [groupName, groupScopes] of Object.entries(OAUTH_SCOPE_GROUPS) as [string, Record<string, string>][]) {
       const groupItems = Object.entries(groupScopes)
         .filter(([key]) => scopes.includes(key))
         .map(([key, description]) => ({ scope: key, description }));
 
-      if (groupItems.length > 0) active[groupName] = groupItems;
+      if (groupItems.length > 0) {
+        active[groupName] = groupItems;
+      }
     }
 
     return active;
   }, [scopes]);
 
-  const hasWriteScopes = requestedScopes.some((scope) =>
-    scope.endsWith(":write"),
-  );
+  const hasWriteScopes = requestedScopes.some(x => x.endsWith(":write"),);
 
   async function respond(consent: boolean) {
-    if (!service) return;
+    if (!service)
+      return;
 
-    if (
-      consent &&
-      trustLevel === "UNTRUSTED" &&
-      typedName.trim() !== service.name
-    ) {
+    if (consent && trustLevel === "UNTRUSTED" && typedName.trim() !== service.name) {
       setError("Please type the app name to continue.");
       return;
     }
@@ -256,6 +248,7 @@ export default function OAuthAuthorize() {
                   >
                     Type <b>{service.name}</b> to confirm
                   </label>
+
                   <input
                     id="app-name-confirm"
                     type="text"
@@ -274,6 +267,7 @@ export default function OAuthAuthorize() {
                 >
                   Deny
                 </Button>
+                
                 <Button
                   kind="primary"
                   onClick={() => respond(true)}

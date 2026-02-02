@@ -4,11 +4,7 @@ import { z } from "zod";
 import { database } from "@/server/db";
 import { getRestAuthContext } from "@/server/auth";
 import { getAllOAuthScopes } from "@/shared/oauthScopes";
-import {
-    createServiceClient,
-    normalizeRedirectUris,
-    normalizeScopes
-} from "@/server/services/serviceClientService";
+import { createServiceClient, normalizeRedirectUris, normalizeScopes } from "@/server/services/serviceClientService";
 
 const CreateSchema = z.object({
     name: z.string().min(2).max(48),

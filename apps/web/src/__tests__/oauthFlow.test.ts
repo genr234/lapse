@@ -1,25 +1,20 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import type { NextApiRequest, NextApiResponse } from "next";
+
 import { setupEnvMock } from "./mocks/env";
-import {
-  setupDatabaseMock,
-  mockDatabase,
-  resetMockDatabase,
-} from "./mocks/database";
+import { setupDatabaseMock, mockDatabase, resetMockDatabase } from "./mocks/database";
 
 setupDatabaseMock();
 setupEnvMock();
 
-let oauthAuthorize: (
-  req: NextApiRequest,
-  res: NextApiResponse,
-) => Promise<void>;
+let oauthAuthorize: (req: NextApiRequest, res: NextApiResponse) => Promise<void>;
 let oauthToken: (req: NextApiRequest, res: NextApiResponse) => Promise<void>;
 let generateJWT: (userId: string, email: string) => string;
 let hashServiceSecret: (secret: string) => string;
 
 function createRes() {
   const headers: Record<string, string> = {};
+
   return {
     statusCode: 200,
     headers,
@@ -38,11 +33,7 @@ function createRes() {
   };
 }
 
-function createReq(options: {
-  method: string;
-  body?: unknown;
-  headers?: Record<string, string>;
-}) {
+function createReq(options: { method: string; body?: unknown; headers?: Record<string, string> }) {
   return {
     method: options.method,
     body: options.body,
@@ -52,12 +43,8 @@ function createReq(options: {
 
 beforeEach(async () => {
   resetMockDatabase();
-  oauthAuthorize = await import("@/pages/api/oauth/authorize").then(
-    (mod) => mod.default,
-  );
-  oauthToken = await import("@/pages/api/oauth/token").then(
-    (mod) => mod.default,
-  );
+  oauthAuthorize = await import("@/pages/api/oauth/authorize").then(mod => mod.default);
+  oauthToken = await import("@/pages/api/oauth/token").then(mod => mod.default);
 
   const authModule = await import("@/server/auth");
   generateJWT = authModule.generateJWT;
@@ -148,6 +135,7 @@ describe("oauth flow", () => {
       tokenReq as unknown as NextApiRequest,
       tokenRes as unknown as NextApiResponse,
     );
+    
     expect(tokenRes.statusCode).toBe(403);
   });
 

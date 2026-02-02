@@ -8,10 +8,10 @@ import { trpc } from "@/client/trpc";
 import { deviceStorage, LocalDevice } from "@/client/deviceStorage";
 import { useAuth } from "@/client/hooks/useAuth";
 
-import { WindowedModal } from "../WindowedModal";
-import { Button } from "../Button";
-import { PasskeyModal } from "../PasskeyModal";
-import { ErrorModal } from "../ErrorModal";
+import { WindowedModal } from "@/client/components/ui/WindowedModal";
+import { Button } from "@/client/components/ui/Button";
+import { PasskeyModal } from "@/client/components/ui/PasskeyModal";
+import { ErrorModal } from "@/client/components/ui/ErrorModal";
 import { OAuthGrantsView } from "@/client/components/ui/layout/OAuthGrantsView";
 
 export function SettingsView({ isOpen, setIsOpen }: {
@@ -225,6 +225,7 @@ export function SettingsView({ isOpen, setIsOpen }: {
           >
             Connected Services
           </Button>
+
           <Button
             kind="regular"
             onClick={() => window.location.assign("/developer/apps")}
@@ -232,6 +233,7 @@ export function SettingsView({ isOpen, setIsOpen }: {
           >
             Developer Apps
           </Button>
+          
           <Button
             kind="primary"
             onClick={() => setIsOpen(false)}

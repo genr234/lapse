@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
-const SWAGGER_HTML = `<!doctype html>
+const SWAGGER_HTML = /*html*/`
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -26,10 +27,12 @@ const SWAGGER_HTML = `<!doctype html>
     });
   </script>
 </body>
-</html>`;
+</html>
+`.trim();
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "GET") return res.status(405).send("Method not allowed");
+  if (req.method !== "GET")
+    return res.status(405).send("Method not allowed");
 
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   return res.status(200).send(SWAGGER_HTML);

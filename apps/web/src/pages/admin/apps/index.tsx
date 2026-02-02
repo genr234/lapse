@@ -57,6 +57,7 @@ export default function AdminApps() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ trustLevel })
       });
+      
       const data = await response.json();
 
       if (!response.ok || !data.ok) {

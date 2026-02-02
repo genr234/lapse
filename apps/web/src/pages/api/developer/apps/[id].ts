@@ -4,18 +4,14 @@ import { z } from "zod";
 import { database } from "@/server/db";
 import { getRestAuthContext } from "@/server/auth";
 import { getAllOAuthScopes } from "@/shared/oauthScopes";
-import {
-    normalizeRedirectUris,
-    normalizeScopes,
-    rotateServiceClientSecret
-} from "@/server/services/serviceClientService";
+import { normalizeRedirectUris, normalizeScopes } from "@/server/services/serviceClientService";
 
 const UpdateSchema = z.object({
     name: z.string().min(2).max(48).optional(),
     description: z.string().max(200).optional(),
-    homepageUrl: z.string().url().optional(),
-    iconUrl: z.string().url().optional(),
-    redirectUris: z.array(z.string().url()).optional(),
+    homepageUrl: z.url().optional(),
+    iconUrl: z.url().optional(),
+    redirectUris: z.array(z.url()).optional(),
     scopes: z.array(z.string()).optional()
 });
 
@@ -41,33 +37,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === "PATCH") {
         const parsed = UpdateSchema.safeParse(req.body);
+
         if (!parsed.success)
             return res.status(400).json({ ok: false, message: "Invalid update payload." });
 
-        const updates: Record<string, unknown> = {
-            ...parsed.data
-        };
+        const updates: Record<string, unknown> = { ...parsed.data };
 
         if (parsed.data.scopes) {
             const validScopes = new Set(getAllOAuthScopes());
             const requestedScopes = normalizeScopes(parsed.data.scopes);
             const invalidScopes = requestedScopes.filter(scope => !validScopes.has(scope));
+
             if (invalidScopes.length > 0)
                 return res.status(400).json({ ok: false, message: `Unknown scopes: ${invalidScopes.join(", ")}` });
 
             updates.scopes = requestedScopes;
         }
 
-        if (parsed.data.redirectUris)
+        if (parsed.data.redirectUris) {
             updates.redirectUris = normalizeRedirectUris(parsed.data.redirectUris);
+        }
 
         if (updates.homepageUrl || updates.redirectUris) {
             const homepageUrl = (updates.homepageUrl as string | undefined) ?? app.homepageUrl;
             const redirectUris = (updates.redirectUris as string[] | undefined) ?? app.redirectUris;
             const homepageHost = new URL(homepageUrl).hostname;
             const mismatched = redirectUris.filter(uri => new URL(uri).hostname !== homepageHost);
-            if (mismatched.length > 0)
+            if (mismatched.length > 0) {
                 return res.status(400).json({ ok: false, message: "Redirect URIs must match the homepage domain." });
+            }
         }
 
         const updated = await database.serviceClient.update({

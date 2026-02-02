@@ -95,20 +95,16 @@ export function createConstrainedMockDatabase() {
     
     // Simulate database constraints and realistic behavior
     db.user.findFirst.mockImplementation(async (query: any) => {
-        // Simulate unique constraint violations
-        if (query.where?.email === "taken@example.com") {
-            return null; // Email already taken
+        if (query.where?.email === "taken@example.com" || query.where?.handle === "taken-handle") {
+            return null; // Email or handle already taken
         }
-        if (query.where?.handle === "taken-handle") {
-            return null; // Handle already taken
-        }
+
         // Return default user for other cases
         const defaultImpl = db.user.findFirst.getMockImplementation();
         return defaultImpl ? defaultImpl(query) : null;
     });
     
     db.serviceClient.findFirst.mockImplementation(async (query: any) => {
-        // Simulate revoked client
         if (query.where?.clientId?.startsWith?.("revoked_")) {
             return null; // Client is revoked
         }

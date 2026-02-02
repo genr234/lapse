@@ -5,7 +5,7 @@ import { Button } from "@/client/components/ui/Button";
 import { useAuth } from "@/client/hooks/useAuth";
 import { OAUTH_SCOPE_GROUPS } from "@/shared/oauthScopes";
 
-import { WindowedModal } from "../WindowedModal";
+import { WindowedModal } from "@/client/components/ui/WindowedModal";
 
 const groupOrder = ["Timelapses", "Comments", "Profile", "Insights"];
 

@@ -33,21 +33,25 @@ const ClientCredentialsSchema = z.object({
 const TOKEN_TTL_SECONDS = 900;
 
 function parseBasicAuth(authorization: string | undefined) {
-  if (!authorization) return null;
+  if (!authorization)
+    return null;
 
   const match = authorization.match(/^Basic\s+(.*)$/i);
-  if (!match) return null;
+  if (!match)
+    return null;
 
   const decoded = Buffer.from(match[1], "base64").toString("utf-8");
   const [clientId, clientSecret] = decoded.split(":");
 
-  if (!clientId || !clientSecret) return null;
+  if (!clientId || !clientSecret)
+    return null;
 
   return { clientId, clientSecret };
 }
 
 function hasAllScopes(allowed: string[], requested: string[]) {
-  if (requested.length === 0) return true;
+  if (requested.length === 0)
+    return true;
 
   const allowedSet = new Set(allowed);
   return requested.every((scope) => allowedSet.has(scope));
@@ -55,10 +59,12 @@ function hasAllScopes(allowed: string[], requested: string[]) {
 
 function parseClientCredentials(req: NextApiRequest) {
   const basic = parseBasicAuth(req.headers.authorization);
-  if (basic) return basic;
+  if (basic)
+    return basic;
 
   const result = ClientCredentialsSchema.safeParse(req.body);
-  if (!result.success) return null;
+  if (!result.success)
+    return null;
 
   return {
     clientId: result.data.client_id,
@@ -66,8 +72,9 @@ function parseClientCredentials(req: NextApiRequest) {
   };
 }
 
-function normalizeScopes(scopeRaw: string | undefined) {
-  if (!scopeRaw) return [] as string[];
+function normalizeScopes(scopeRaw: string | undefined): string[] {
+  if (!scopeRaw)
+    return [];
 
   return scopeRaw
     .split(" ")
@@ -102,7 +109,7 @@ function resolveSubjectTokenType(subjectTokenType: string) {
 export const config = {
   api: {
     bodyParser: false,
-  },
+  }
 };
 
 export default async function handler(
@@ -126,12 +133,14 @@ export default async function handler(
     } else {
       rawBody = JSON.stringify(req.body);
     }
-  } else {
+  }
+  else {
     // Read the stream manually since bodyParser is off
     const chunks: Buffer[] = [];
     for await (const chunk of req) {
       chunks.push(chunk as Buffer);
     }
+
     rawBody = Buffer.concat(chunks).toString("utf-8");
   }
 
@@ -140,67 +149,76 @@ export default async function handler(
     try {
       const params = new URLSearchParams(rawBody);
       const parsedBody: Record<string, string> = {};
+
       for (const [key, value] of params.entries()) {
         parsedBody[key] = value;
       }
+
       req.body = parsedBody;
-    } catch (e) {
+    }
+    catch (e) {
       console.error("Failed to parse x-www-form-urlencoded body", e);
       req.body = {};
     }
-  } else if (contentType.includes("application/json")) {
+  }
+  else if (contentType.includes("application/json")) {
     try {
       req.body = JSON.parse(rawBody);
-    } catch (e) {
+    }
+    catch (e) {
       console.error("Failed to parse JSON body", e);
       req.body = {};
     }
-  } else if (rawBody.trim()) {
+  }
+  else if (rawBody.trim()) {
     try {
       req.body = JSON.parse(rawBody);
-    } catch {
+    }
+    catch {
       req.body = {};
     }
-  } else {
+  }
+  else {
     req.body = {};
   }
 
   const requestBody = TokenExchangeSchema.safeParse(req.body);
-  if (!requestBody.success)
+  if (!requestBody.success) {
     return res
       .status(400)
       .json({
         error: "invalid_request",
         error_description: "Invalid token exchange payload.",
       });
+  }
 
   const credentials = parseClientCredentials(req);
-  if (!credentials)
+  if (!credentials) {
     return res
       .status(401)
       .json({
         error: "invalid_client",
         error_description: "Missing client credentials.",
       });
-
-  const subjectTokenType = resolveSubjectTokenType(
-    requestBody.data.subject_token_type,
-  );
-  if (!subjectTokenType)
+  }
+  const subjectTokenType = resolveSubjectTokenType(requestBody.data.subject_token_type);
+  if (!subjectTokenType) {
     return res
       .status(400)
       .json({
         error: "invalid_request",
         error_description: "Unsupported subject_token_type.",
       });
+  }
 
-  if (subjectTokenType !== "access_token" && subjectTokenType !== "jwt")
+  if (subjectTokenType !== "access_token" && subjectTokenType !== "jwt") {
     return res
       .status(400)
       .json({
         error: "invalid_request",
         error_description: "Unsupported subject_token_type.",
       });
+  }
 
   const serviceClient = await database.serviceClient.findFirst({
     where: { clientId: credentials.clientId, revokedAt: null },
@@ -212,60 +230,67 @@ export default async function handler(
       credentials.clientSecret,
       serviceClient.clientSecretHash,
     )
-  )
+  ) {
     return res
       .status(401)
       .json({
         error: "invalid_client",
         error_description: "Invalid client credentials.",
       });
+  }
 
   const requestedScopes = normalizeScopes(requestBody.data.scope);
   const invalidScopes = getInvalidScopes(requestedScopes);
-  if (invalidScopes.length > 0)
+  if (invalidScopes.length > 0) {
     return res
       .status(400)
       .json({
         error: "invalid_scope",
         error_description: `Unknown scopes: ${invalidScopes.join(", ")}`,
       });
+  }
 
-  if (!hasAllScopes(serviceClient.scopes, requestedScopes))
+  if (!hasAllScopes(serviceClient.scopes, requestedScopes)) {
     return res
       .status(403)
       .json({
         error: "invalid_scope",
         error_description: "Requested scope is not allowed.",
       });
+  }
 
   const subjectToken = requestBody.data.subject_token;
   const subjectPayload = verifyJWT(subjectToken);
-  if (!subjectPayload)
+  if (!subjectPayload) {
     return res
       .status(400)
       .json({
         error: "invalid_request",
         error_description: "Invalid subject token.",
       });
+  }
 
-  if (verifyOboJWT(subjectToken))
+  if (verifyOboJWT(subjectToken)) {
     return res
       .status(400)
       .json({
         error: "invalid_request",
         error_description: "Subject token must not be an OBO token.",
       });
+  }
 
   const subjectUser = await database.user.findFirst({
     where: { id: subjectPayload.userId },
   });
-  if (!subjectUser)
+
+  if (!subjectUser) {
     return res
       .status(400)
       .json({
         error: "invalid_request",
         error_description: "Subject user not found.",
       });
+  }
 
   const grant = await database.serviceGrant.findFirst({
     where: {
@@ -275,13 +300,14 @@ export default async function handler(
     },
   });
 
-  if (!grant)
+  if (!grant) {
     return res
       .status(403)
       .json({
         error: "access_denied",
         error_description: "User has not granted access.",
       });
+  }
 
   const grantScopes = grant.scopes;
   const finalScopes = sanitizeScopes(
@@ -290,21 +316,23 @@ export default async function handler(
       : grantScopes,
   );
 
-  if (finalScopes.length === 0)
+  if (finalScopes.length === 0) {
     return res
       .status(403)
       .json({
         error: "access_denied",
         error_description: "No allowed scopes for this user.",
       });
+  }
 
-  if (finalScopes.length !== new Set(finalScopes).size)
+  if (finalScopes.length !== new Set(finalScopes).size) {
     return res
       .status(400)
       .json({
         error: "invalid_scope",
         error_description: "Duplicate scopes are not allowed.",
       });
+  }
 
   const oboToken = generateOboJWT(
     subjectUser.id,

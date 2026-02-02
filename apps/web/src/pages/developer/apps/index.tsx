@@ -29,14 +29,17 @@ type DeveloperApp = {
 
 function buildAuthorizeTestUrl(app: DeveloperApp) {
   const redirectUri = app.redirectUris[0];
-  if (!redirectUri) return null;
+  if (!redirectUri)
+    return null;
 
   const params = new URLSearchParams({
     client_id: app.clientId,
     redirect_uri: redirectUri,
   });
 
-  if (app.scopes.length > 0) params.set("scope", app.scopes.join(" "));
+  if (app.scopes.length > 0) {
+    params.set("scope", app.scopes.join(" "));
+  }
 
   return `/oauth/authorize?${params.toString()}`;
 }
@@ -54,10 +57,9 @@ export default function DeveloperApps() {
     redirectUris: "",
     scopes: scopeEntries.map((scope) => scope.key),
   });
-  const [secretResult, setSecretResult] = useState<{
-    clientId: string;
-    clientSecret: string;
-  } | null>(null);
+
+  const [secretResult, setSecretResult] = useState<{ clientId: string; clientSecret: string } | null>(null);
+
   const [appModalOpen, setAppModalOpen] = useState(false);
   const [appModalMode, setAppModalMode] = useState<"create" | "edit">("create");
   const [appModalId, setAppModalId] = useState<string | null>(null);
@@ -66,7 +68,8 @@ export default function DeveloperApps() {
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser)
+      return;
 
     (async () => {
       setIsLoading(true);
@@ -82,22 +85,23 @@ export default function DeveloperApps() {
         }
 
         setApps(data.data.apps);
-      } catch (err) {
+      }
+      catch (err) {
         console.error("(developer/apps) failed to load", err);
         setError("Unable to load apps.");
-      } finally {
+      }
+      finally {
         setIsLoading(false);
       }
     })();
   }, [auth.currentUser]);
 
   const modalRedirectUris = useMemo(
-    () =>
-      formState.redirectUris
+    () => formState.redirectUris
         .split("\n")
         .map((item) => item.trim())
         .filter(Boolean),
-    [formState.redirectUris],
+    [formState.redirectUris]
   );
 
   async function createApp() {
@@ -129,6 +133,7 @@ export default function DeveloperApps() {
         clientId: data.data.app.clientId,
         clientSecret: data.data.clientSecret,
       });
+
       setFormState({
         name: "",
         description: "",
@@ -137,8 +142,10 @@ export default function DeveloperApps() {
         redirectUris: "",
         scopes: formState.scopes,
       });
+
       setAppModalOpen(false);
-    } catch (err) {
+    }
+    catch (err) {
       console.error("(developer/apps) failed to create", err);
       setError("Unable to create app.");
     }
@@ -151,6 +158,7 @@ export default function DeveloperApps() {
       const response = await fetch(`/api/developer/apps/${appId}`, {
         method: "DELETE",
       });
+
       const data = await response.json();
 
       if (!response.ok || !data.ok) {
@@ -166,7 +174,8 @@ export default function DeveloperApps() {
         setAppModalMode("create");
         setAppModalId(null);
       }
-    } catch (err) {
+    }
+    catch (err) {
       console.error("(developer/apps) failed to delete", err);
       setError("Unable to delete app.");
     }
@@ -182,10 +191,9 @@ export default function DeveloperApps() {
     try {
       const response = await fetch(
         `/api/developer/apps/${appId}/rotate-secret`,
-        {
-          method: "POST",
-        },
+        { method: "POST" }
       );
+
       const data = await response.json();
 
       if (!response.ok || !data.ok) {
@@ -193,15 +201,18 @@ export default function DeveloperApps() {
         return;
       }
 
-      const app = apps.find((entry) => entry.id === appId);
-      if (!app) return;
+      const app = apps.find(x => x.id === appId);
+      if (!app)
+        return;
 
       setSecretResult({
         clientId: app.clientId,
         clientSecret: data.data.clientSecret,
       });
+
       setRotateSecretId(null);
-    } catch (err) {
+    }
+    catch (err) {
       console.error("(developer/apps) failed to rotate secret", err);
       setError("Unable to rotate secret.");
     }
@@ -222,6 +233,7 @@ export default function DeveloperApps() {
       redirectUris: app.redirectUris.join("\n"),
       scopes: app.scopes,
     });
+
     setAppModalOpen(true);
   }
 
@@ -232,7 +244,8 @@ export default function DeveloperApps() {
   }
 
   async function saveEdit() {
-    if (!appModalId) return;
+    if (!appModalId)
+      return;
 
     setError(null);
     setSaveNotice(null);
@@ -262,7 +275,8 @@ export default function DeveloperApps() {
       setAppModalOpen(false);
       setAppModalMode("create");
       setAppModalId(null);
-    } catch (err) {
+    }
+    catch (err) {
       console.error("(developer/apps) failed to update", err);
       setError("Unable to update app.");
     }
@@ -379,6 +393,7 @@ export default function DeveloperApps() {
             </div>
           )}
         </div>
+
         <WindowedModal
           icon="plus"
           title={appModalMode === "create" ? "Create App" : "Edit App"}
@@ -395,6 +410,7 @@ export default function DeveloperApps() {
               placeholder="App name"
               className="rounded-xl border border-slate bg-dark px-4 py-2"
             />
+
             <input
               value={formState.homepageUrl}
               onChange={(event) =>
@@ -403,6 +419,7 @@ export default function DeveloperApps() {
               placeholder="Homepage URL"
               className="rounded-xl border border-slate bg-dark px-4 py-2"
             />
+
             <textarea
               value={formState.description}
               onChange={(event) =>
@@ -411,6 +428,7 @@ export default function DeveloperApps() {
               placeholder="Description"
               className="rounded-xl border border-slate bg-dark px-4 py-2 min-h-22.5"
             />
+
             <input
               value={formState.iconUrl}
               onChange={(event) =>
@@ -419,6 +437,7 @@ export default function DeveloperApps() {
               placeholder="Icon URL (optional)"
               className="rounded-xl border border-slate bg-dark px-4 py-2"
             />
+
             <textarea
               value={formState.redirectUris}
               onChange={(event) =>
@@ -466,6 +485,7 @@ export default function DeveloperApps() {
               >
                 Cancel
               </Button>
+
               <Button
                 kind="primary"
                 onClick={() =>
@@ -490,6 +510,7 @@ export default function DeveloperApps() {
             <p className="text-muted text-sm">
               Deleting this app will revoke all grants and disable OAuth flows.
             </p>
+
             <div className="flex gap-2">
               <Button
                 kind="regular"
@@ -498,6 +519,7 @@ export default function DeveloperApps() {
               >
                 Cancel
               </Button>
+
               <Button
                 kind="destructive"
                 onClick={() => deleteConfirmId && deleteApp(deleteConfirmId)}
@@ -521,6 +543,7 @@ export default function DeveloperApps() {
               Rotating the secret will invalidate the existing secret
               immediately.
             </p>
+
             <div className="flex gap-2">
               <Button
                 kind="regular"
@@ -529,6 +552,7 @@ export default function DeveloperApps() {
               >
                 Cancel
               </Button>
+              
               <Button
                 kind="primary"
                 onClick={() => rotateSecretId && rotateSecret(rotateSecretId)}
