@@ -14,7 +14,7 @@ import { env } from "@/server/env";
 import { HackatimeOAuthApi, HackatimeUserApi, WakaTimeHeartbeat } from "@/server/hackatime";
 import { logError, logInfo, logRequest } from "@/server/serverCommon";
 import { generateThumbnail } from "@/server/videoProcessing";
-import { Actor, ApiDate, PublicId } from "@/server/routers/common";
+import { Actor, actorEntitledTo, actorIsServer, actorIsUser, ApiDate, PublicId } from "@/server/routers/common";
 import { dtoKnownDevice, dtoPublicUser, KnownDeviceSchema, PublicUserSchema } from "@/server/routers/api/user";
 import { CommentSchema, DbComment, dtoComment } from "@/server/routers/api/comment";
 import { database } from "@/server/db";
@@ -35,7 +35,7 @@ export type DbOwnedTimelapse = DbTimelapse & { owner: db.User, device: db.KnownD
 /**
  * Converts a database representation of a timelapse to a runtime (API) one. This excludes private fields.
  */
-export function dtoTimelapse(entity: DbTimelapse): Timelapse {
+export function dtoPublicTimelapse(entity: DbTimelapse): Timelapse {
     // This lacks `isPublished` so that we have to mark it explicitly when creating a DTO
     // that might hold private data (e.g. device names).
     return {
@@ -61,12 +61,29 @@ export function dtoTimelapse(entity: DbTimelapse): Timelapse {
  */
 export function dtoOwnedTimelapse(entity: DbOwnedTimelapse): OwnedTimelapse {
     return {
-        ...dtoTimelapse(entity),
+        ...dtoPublicTimelapse(entity),
         private: {
             device: entity.device ? dtoKnownDevice(entity.device) : null,
             hackatimeProject: entity.hackatimeProject
         }
     };
+}
+
+/**
+ * Converts a database representation of a timelapse to a runtime (API) one, including all private fields if the
+ * `actor` is entitled to said fields.
+ */
+export function dtoTimelapse(entity: DbTimelapse | DbOwnedTimelapse, actor: Actor): Timelapse | OwnedTimelapse {
+    if (actorEntitledTo(entity, actor) && "device" in entity) {
+        // This timelapse should be considered owned.
+        return dtoOwnedTimelapse(entity);
+    }
+
+    // Either not enough data in our `entity` payload, or the actor does not own this timelapse.
+    if (!entity.isPublished)
+        throw new Error("Attempted to DTO a unpublished timelapse as an actor that does not own it!");
+
+    return dtoPublicTimelapse(entity);
 }
 
 /**
@@ -114,20 +131,10 @@ export async function getTimelapseById(id: string, actor: Actor): Promise<Result
     if (!timelapse)
         return new Err("NOT_FOUND", "Couldn't find that timelapse!");
 
-    const isOwner = (
-        (actor === "SERVER")
-            ? true
-            : (
-                (actor && actor.id === timelapse.ownerId) ||
-                (actor && (actor.permissionLevel in oneOf("ADMIN", "ROOT"))
-            )
-        )
-    );
-
-    if (!timelapse.isPublished && !isOwner)
+    if (!timelapse.isPublished && !actorEntitledTo(timelapse, actor))
         return new Err("NOT_FOUND", "Couldn't find that timelapse!");
 
-    return isOwner ? dtoOwnedTimelapse(timelapse) : dtoTimelapse(timelapse);
+    return dtoTimelapse(timelapse, actor);
 }
 
 /**
@@ -682,9 +689,7 @@ export default router({
                 }
             });
 
-            return apiOk({
-                timelapses: timelapses.map(x => x.ownerId == req.ctx.user?.id ? dtoOwnedTimelapse(x) : dtoTimelapse(x) ),
-            });
+            return apiOk({ timelapses: timelapses.map(x => dtoTimelapse(x, req.ctx.user)) });
         }),
 
     syncWithHackatime: protectedProcedure("POST", "/timelapse/syncWithHackatime")
@@ -774,6 +779,6 @@ export default router({
                 include: TIMELAPSE_INCLUDES
             });
 
-            return apiOk({ timelapse: dtoOwnedTimelapse(updatedTimelapse) });
+            return apiOk({ timelapse: dtoTimelapse(updatedTimelapse, req.ctx.user) });
         })
 });

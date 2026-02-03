@@ -6,7 +6,7 @@ import { apiResult, daysAgo, descending, apiOk } from "@/shared/common";
 
 import { publicProcedure, router } from "@/server/trpc";
 import { logError } from "@/server/serverCommon";
-import { dtoTimelapse, TimelapseSchema } from "@/server/routers/api/timelapse";
+import { dtoPublicTimelapse, TimelapseSchema } from "@/server/routers/api/timelapse";
 import { UserDisplayName, UserHandle } from "@/server/routers/api/user";
 import { PublicId } from "@/server/routers/common";
 import { database } from "@/server/db";
@@ -106,7 +106,7 @@ export default router({
             });
 
             return apiOk({
-                timelapses: timelapses.map(dtoTimelapse)
+                timelapses: timelapses.map(dtoPublicTimelapse)
             });
         }),
 
