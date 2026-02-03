@@ -286,6 +286,9 @@ async function updateDockerComposeFile(localstackImage: string | null) {
 	let composeContent = await fs.readFile(composeFile, "utf-8");
 	if (localstackImage) {
 		composeContent = buildLocalstackDockerComposeSection(composeContent, localstackImage);
+
+		const initS3Path = resolve(repoRoot, "init-s3.sh");
+		await fs.chmod(initS3Path, 0o755);
 	}
 
 	// new name: lapse.dev.yaml
