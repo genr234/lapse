@@ -5,7 +5,7 @@ import { z } from "zod";
 import { apiResult, assert, descending, apiErr, when, apiOk } from "@/shared/common";
 import { MIN_HANDLE_LENGTH, MAX_HANDLE_LENGTH } from "@/shared/constants";
 
-import { router, protectedProcedure, publicProcedure } from "@/server/trpc";
+import { router, protectedProcedure, publicProcedure, procedure } from "@/server/trpc";
 import { logError, logRequest } from "@/server/serverCommon";
 import { deleteTimelapse } from "@/server/routers/api/timelapse";
 import { ApiDate, PublicId } from "@/server/routers/common";
@@ -196,14 +196,17 @@ export default router({
         }),
 
     query: publicProcedure("GET", "/user/query")
-        .summary("Finds a profile by its handle or ID.")
+        .summary("Finds a profile by its handle, ID, or Hackatime ID.")
         .input(
             z.object({
                 id: PublicId.optional()
-                    .describe("The ID of the profile to query. Can be undefined if `handle` is specified."),
+                    .describe("The ID of the profile to query. Can be undefined if another field is specified."),
 
                 handle: z.string().optional()
-                    .describe("The handle of the profile to query. Can be undefined if `id` is specified.")
+                    .describe("The handle of the profile to query. Can be undefined if another field is specified."),
+
+                hackatimeId: z.number().min(1).optional()
+                    .describe("The Hackatime ID of the profile to query. Can be undefined if another field is specified."),
             })
         )
         .output(
@@ -214,9 +217,6 @@ export default router({
         .query(async (req) => {
             logRequest("user/query", req);
             
-            if (!req.input.handle && !req.input.id)
-                return apiErr("MISSING_PARAMS", "No handle or user ID specified"); 
-
             let dbUser: DbCompositeUser | null;
 
             if (req.input.handle) {
@@ -225,12 +225,20 @@ export default router({
                     include: { devices: true }
                 });
             }
-            else {
-                assert(req.input.id != undefined, "Both req.input.handle and req.input.id were undefined");
+            else if (req.input.id) {
                 dbUser = await database.user.findFirst({
                     where: { id: req.input.id },
                     include: { devices: true }
                 });
+            }
+            else if (req.input.hackatimeId) {
+                dbUser = await database.user.findFirst({
+                    where: { hackatimeId: req.input.hackatimeId.toString() },
+                    include: { devices: true }
+                });
+            }
+            else {
+                return apiErr("MISSING_PARAMS", "No handle, user ID, or Hackatime ID specified"); 
             }
 
             if (!dbUser)
