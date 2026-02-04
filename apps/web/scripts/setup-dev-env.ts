@@ -251,7 +251,7 @@ async function updateEnvFile(envVars: Record<string, string>) {
 	try {
 		env = await fs.readFile(resolve(webDir, ".env.example"), "utf-8");
 		for (const [key, value] of Object.entries(envVars)) {
-			env = env.replace(`${key}=`, `${key}=${value}`);
+			env = env.replace(new RegExp(`^${key}=.*$`, "m"), `${key}=${value}`);
 		}
 
 		await fs.writeFile(resolve(webDir, ".env"), env);
