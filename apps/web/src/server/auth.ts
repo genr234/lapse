@@ -1,7 +1,7 @@
 import "@/server/allow-only-server";
 
 import jwt from "jsonwebtoken";
-import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { randomBytes, scrypt, scryptSync, timingSafeEqual } from "node:crypto";
 import { NextApiRequest } from "next";
 
 import * as db from "@/generated/prisma/client";
@@ -114,12 +114,22 @@ export function hashServiceSecret(secret: string): string {
     return `${salt}:${hashed}`;
 }
 
-export function verifyServiceSecret(secret: string, stored: string): boolean {
+export async function verifyServiceSecret(secret: string, stored: string): Promise<boolean> {
     const [salt, hashed] = stored.split(":");
     if (!salt || !hashed)
         return false;
 
-    const derived = scryptSync(secret, salt, 64);
+    const derived = await new Promise<Buffer<ArrayBuffer>>((resolve, reject) => {
+        scrypt(secret, salt, 64, (err, val) => {
+            if (err) {
+                reject(err);
+            }
+            else {
+                resolve(val);
+            } 
+        });
+    });
+
     const storedBuffer = Buffer.from(hashed, "hex");
     if (derived.length !== storedBuffer.length)
         return false;

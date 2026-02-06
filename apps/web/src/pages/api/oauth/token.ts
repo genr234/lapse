@@ -1,14 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { z } from "zod";
 
-import {
-  generateOboJWT,
-  OBO_AUDIENCE,
-  OBO_ISSUER,
-  verifyJWT,
-  verifyOboJWT,
-  verifyServiceSecret,
-} from "@/server/auth";
+import { generateOboJWT, OBO_AUDIENCE, OBO_ISSUER, verifyJWT, verifyOboJWT, verifyServiceSecret } from "@/server/auth";
 import { database } from "@/server/db";
 import { logNextRequest } from "@/server/serverCommon";
 import { getAllOAuthScopes } from "@/shared/oauthScopes";
@@ -226,9 +219,11 @@ export default async function handler(
 
   if (
     !serviceClient ||
-    !verifyServiceSecret(
-      credentials.clientSecret,
-      serviceClient.clientSecretHash,
+    !(
+      await verifyServiceSecret(
+        credentials.clientSecret,
+        serviceClient.clientSecretHash,
+      )
     )
   ) {
     return res
