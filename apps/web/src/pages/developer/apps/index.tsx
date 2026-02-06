@@ -5,6 +5,7 @@ import { Button } from "@/client/components/ui/Button";
 import { WindowedModal } from "@/client/components/ui/WindowedModal";
 import { useAuth } from "@/client/hooks/useAuth";
 import { OAUTH_SCOPE_GROUPS } from "@/shared/oauthScopes";
+import Icon from "@hackclub/icons";
 
 const scopeEntries = Object.entries(OAUTH_SCOPE_GROUPS).flatMap(
   ([group, scopes]) =>
@@ -284,44 +285,45 @@ export default function DeveloperApps() {
 
   return (
     <RootLayout showHeader={true} title="Developer Apps">
-      <div className="flex flex-col gap-8 p-8 sm:p-12">
-        <div>
-          <h1 className="text-3xl font-bold">Developer Apps</h1>
-          <p className="text-muted">
-            Register an OAuth app for Lapse. Untrusted apps show a warning
-            during consent.
-          </p>
+      <div className="flex flex-col gap-8 px-16 py-4 sm:px-24">
+        <div className="flex justify-between">
+          <div className="flex items-center gap-4">
+            <Icon glyph="code" width={48} height={48} className="flex-shrink-0" />
+
+            <div>
+              <h1 className="text-3xl font-bold">Developer Apps</h1>
+              <p className="text-muted">
+                Register an OAuth app for Lapse. Untrusted apps show a warning
+                during consent.
+              </p>
+            </div>
+          </div>
+
+          <Button
+            kind="primary"
+            onClick={() => {
+              setAppModalMode("create");
+              setFormState({
+                name: "",
+                description: "",
+                homepageUrl: "",
+                iconUrl: "",
+                redirectUris: "",
+                scopes: scopeEntries.map((scope) => scope.key),
+              });
+              setAppModalOpen(true);
+            }}
+          >
+            Create App
+          </Button>
         </div>
 
         {error && <div className="text-red-400">{error}</div>}
         {saveNotice && <div className="text-emerald-300">{saveNotice}</div>}
 
-        <div className="rounded-3xl border border-black bg-darkless p-6 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Your apps</h2>
-            <Button
-              kind="primary"
-              onClick={() => {
-                setAppModalMode("create");
-                setFormState({
-                  name: "",
-                  description: "",
-                  homepageUrl: "",
-                  iconUrl: "",
-                  redirectUris: "",
-                  scopes: scopeEntries.map((scope) => scope.key),
-                });
-                setAppModalOpen(true);
-              }}
-            >
-              Create App
-            </Button>
-          </div>
-        </div>
-
         {secretResult && (
-          <div className="rounded-2xl border border-red bg-dark p-4 text-sm text-red-200">
-            <p className="font-semibold">Save your client secret now</p>
+          <div className="rounded-2xl border border-red bg-dark p-6 text-red-200">
+            <p className="font-semibold text-lg">This is your client secret for your new app - it won't be shown again!</p>
             <p>
               Client ID:{" "}
               <span className="font-mono">{secretResult.clientId}</span>
@@ -335,24 +337,22 @@ export default function DeveloperApps() {
 
         <div className="flex flex-col gap-4">
           {isLoading && <p className="text-muted">Loading apps...</p>}
+
           {!isLoading && apps.length === 0 && (
             <p className="text-muted">No apps yet.</p>
           )}
+
           {!isLoading && apps.length > 0 && (
             <div className="flex flex-col gap-4">
               {apps.map((app) => (
                 <div
                   key={app.id}
-                  className="rounded-2xl border border-slate bg-dark p-4 flex flex-col gap-3"
+                  className="rounded-2xl border border-slate bg-dark px-8 py-4 flex flex-col gap-3"
                 >
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col">
                     <span className="text-lg font-semibold">{app.name}</span>
-                    <span className="text-xs text-muted">
-                      Client ID: {app.clientId}
-                    </span>
-                    <span className="text-xs text-muted">
-                      Trust: {app.trustLevel}
-                    </span>
+                    <span className="text-muted">Client ID: <span className="font-mono">{app.clientId}</span></span>
+                    <span className="text-muted">Trust level: <span className="font-mono">{app.trustLevel}</span></span>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
@@ -360,6 +360,7 @@ export default function DeveloperApps() {
                       kind="regular"
                       onClick={() => beginEdit(app)}
                       className="w-fit"
+                      icon="edit"
                     >
                       Edit App
                     </Button>
@@ -367,8 +368,9 @@ export default function DeveloperApps() {
                     <Button
                       kind="regular"
                       href={buildAuthorizeTestUrl(app) ?? "#"}
-                      disabled={buildAuthorizeTestUrl(app) !== null}
+                      disabled={buildAuthorizeTestUrl(app) == null}
                       className="w-fit"
+                      icon="flag"
                     >
                       Test Auth
                     </Button>
@@ -377,6 +379,7 @@ export default function DeveloperApps() {
                       kind="regular"
                       onClick={() => confirmRotateSecret(app.id)}
                       className="w-fit"
+                      icon="view-reload"
                     >
                       Rotate Secret
                     </Button>
@@ -384,6 +387,7 @@ export default function DeveloperApps() {
                       kind="destructive"
                       onClick={() => confirmDeleteApp(app.id)}
                       className="w-fit"
+                      icon="delete"
                     >
                       Delete App
                     </Button>

@@ -6,6 +6,7 @@ import { Button } from "@/client/components/ui/Button";
 
 import { useAuth } from "@/client/hooks/useAuth";
 import { OAUTH_SCOPE_GROUPS } from "@/shared/oauthScopes";
+import Icon from "@hackclub/icons";
 
 type ServiceInfo = {
   id: string;
@@ -129,8 +130,10 @@ export default function OAuthAuthorize() {
       }
     }
 
+    active["Extra"] = [{ scope: "extra", description: extraScope }];
+
     return active;
-  }, [scopes]);
+  }, [scopes, extraScope]);
 
   const hasWriteScopes = requestedScopes.some(x => x.endsWith(":write"),);
 
@@ -175,7 +178,7 @@ export default function OAuthAuthorize() {
   }
 
   return (
-    <RootLayout showHeader={false} title="Authorize Service">
+    <RootLayout showHeader={false} title={`Authorize ${service?.name ?? "Service"} - Lapse`}>
       <div className="min-h-[60vh] w-full flex justify-center items-center p-8 sm:p-12">
         <div className="w-full max-w-2xl rounded-3xl border border-black bg-darkless shadow-lg p-8 sm:p-10 flex flex-col gap-6">
           {isLoading && (
@@ -190,27 +193,12 @@ export default function OAuthAuthorize() {
 
           {!isLoading && !error && service && (
             <>
-              <div className="flex flex-col gap-2">
-                <h1 className="text-3xl font-bold">Authorize {service.name}</h1>
-                <p className="text-muted">
-                  This service is requesting access to your Lapse account.
+              <div className="flex flex-col text-center">
+                <h1 className="text-3xl font-bold">{service.name}</h1>
+                <p className="text-lg text-muted">
+                  wants access to your Lapse account
                 </p>
               </div>
-
-              {trustLevel === "UNTRUSTED" && (
-                <div className="rounded-2xl border border-red bg-dark p-4 text-sm text-red-300">
-                  <p className="font-semibold">Untrusted developer</p>
-                  <p>
-                    Granting access lets this app act as you. Only proceed if
-                    you trust the developer.
-                  </p>
-                  {hasWriteScopes && (
-                    <p className="mt-2">
-                      This app requests write access to your data.
-                    </p>
-                  )}
-                </div>
-              )}
 
               <div className="rounded-2xl border border-slate bg-dark p-6 flex flex-col gap-4">
                 {Object.keys(groupedScopes).length === 0 && (
@@ -220,33 +208,45 @@ export default function OAuthAuthorize() {
                 )}
 
                 {Object.entries(groupedScopes).map(([group, items]) => (
-                  <div key={group} className="flex flex-col gap-2">
+                  <div key={group} className="flex flex-col gap-1">
                     <h2 className="text-lg font-semibold">{group}</h2>
                     <ul className="flex flex-col gap-1">
                       {items.map((item) => (
-                        <li key={item.scope} className="text-sm text-muted">
-                          • {item.description}
+                        <li key={item.scope} className="text-sm text-muted flex gap-2">
+                          <span>&bull;</span> <span>{item.description}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
                 ))}
-
-                <div className="flex flex-col gap-2">
-                  <h2 className="text-lg font-semibold">Extra</h2>
-                  <ul className="flex flex-col gap-1">
-                    <li className="text-sm text-muted">• {extraScope}</li>
-                  </ul>
-                </div>
               </div>
+
+              {trustLevel === "UNTRUSTED" && (
+                <div className="rounded-2xl border border-red bg-dark p-4 text-sm text-red-300 flex items-center gap-4">
+                  <Icon glyph="important-fill" size={48} className="h-full" />
+
+                  <div className="">
+                    <p className="font-semibold text-lg">Community app</p>
+                    <p>
+                      Granting access lets this app act as you. Only proceed if
+                      you trust the developer.
+                    </p>
+                    {hasWriteScopes && (
+                      <p>
+                        This app requests <b>write access</b> to your data.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {trustLevel === "UNTRUSTED" && (
                 <div className="flex flex-col gap-2">
                   <label
                     htmlFor="app-name-confirm"
-                    className="text-sm text-muted"
+                    className="text-muted"
                   >
-                    Type <b>{service.name}</b> to confirm
+                    Type <b>{service.name}</b> to confirm.
                   </label>
 
                   <input
