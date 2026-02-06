@@ -9,9 +9,9 @@ import { createServiceClient, normalizeRedirectUris, normalizeScopes } from "@/s
 const CreateSchema = z.object({
     name: z.string().min(2).max(48),
     description: z.string().max(200).default(""),
-    homepageUrl: z.string().url(),
-    iconUrl: z.string().url().optional(),
-    redirectUris: z.array(z.string().url()).min(1),
+    homepageUrl: z.url(),
+    iconUrl: z.union([z.url(), z.literal("")]).optional(),
+    redirectUris: z.array(z.url()).min(1),
     scopes: z.array(z.string()).min(1)
 });
 
