@@ -1,19 +1,21 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { z } from "zod";
 
-import { generateOboJWT, OBO_AUDIENCE, OBO_ISSUER, verifyJWT, verifyOboJWT, verifyServiceSecret } from "@/server/auth";
+import {
+  generateOboJWT,
+  OBO_AUDIENCE,
+  OBO_ISSUER,
+  verifyOAuthCode,
+  verifyServiceSecret,
+} from "@/server/auth";
 import { database } from "@/server/db";
 import { logNextRequest } from "@/server/serverCommon";
 import { getAllOAuthScopes } from "@/shared/oauthScopes";
 
-const TokenExchangeSchema = z.object({
-  grant_type: z.literal("urn:ietf:params:oauth:grant-type:token-exchange"),
-  resource: z.string().optional(),
-  audience: z.string().optional(),
-  scope: z.string().max(512).optional(),
-  requested_token_type: z.string().optional(),
-  subject_token: z.string(),
-  subject_token_type: z.string(),
+const AuthCodeSchema = z.object({
+  grant_type: z.literal("authorization_code"),
+  code: z.string(),
+  redirect_uri: z.string().optional(),
   client_id: z.string().optional(),
   client_secret: z.string().optional(),
 });
@@ -65,16 +67,6 @@ function parseClientCredentials(req: NextApiRequest) {
   };
 }
 
-function normalizeScopes(scopeRaw: string | undefined): string[] {
-  if (!scopeRaw)
-    return [];
-
-  return scopeRaw
-    .split(" ")
-    .map((scope) => scope.trim())
-    .filter(Boolean);
-}
-
 function sanitizeScopes(scopes: string[]) {
   return scopes
     .map((scope) => scope.trim())
@@ -84,19 +76,6 @@ function sanitizeScopes(scopes: string[]) {
 function getInvalidScopes(scopes: string[]) {
   const allowed = new Set(getAllOAuthScopes());
   return scopes.filter((scope) => !allowed.has(scope));
-}
-
-function resolveSubjectTokenType(subjectTokenType: string) {
-  if (subjectTokenType === "urn:ietf:params:oauth:token-type:access_token")
-    return "access_token" as const;
-
-  if (subjectTokenType === "urn:ietf:params:oauth:token-type:jwt")
-    return "jwt" as const;
-
-  if (subjectTokenType === "urn:ietf:params:oauth:token-type:id_token")
-    return "id_token" as const;
-
-  return null;
 }
 
 export const config = {
@@ -175,13 +154,13 @@ export default async function handler(
     req.body = {};
   }
 
-  const requestBody = TokenExchangeSchema.safeParse(req.body);
+  const requestBody = AuthCodeSchema.safeParse(req.body);
   if (!requestBody.success) {
     return res
       .status(400)
       .json({
         error: "invalid_request",
-        error_description: "Invalid token exchange payload.",
+        error_description: "Invalid authorization code exchange payload.",
       });
   }
 
@@ -194,25 +173,6 @@ export default async function handler(
         error_description: "Missing client credentials.",
       });
   }
-  const subjectTokenType = resolveSubjectTokenType(requestBody.data.subject_token_type);
-  if (!subjectTokenType) {
-    return res
-      .status(400)
-      .json({
-        error: "invalid_request",
-        error_description: "Unsupported subject_token_type.",
-      });
-  }
-
-  if (subjectTokenType !== "access_token" && subjectTokenType !== "jwt") {
-    return res
-      .status(400)
-      .json({
-        error: "invalid_request",
-        error_description: "Unsupported subject_token_type.",
-      });
-  }
-
   const serviceClient = await database.serviceClient.findFirst({
     where: { clientId: credentials.clientId, revokedAt: null },
   });
@@ -234,7 +194,45 @@ export default async function handler(
       });
   }
 
-  const requestedScopes = normalizeScopes(requestBody.data.scope);
+  const authCode = verifyOAuthCode(requestBody.data.code);
+  if (!authCode) {
+    return res
+      .status(400)
+      .json({
+        error: "invalid_grant",
+        error_description: "Authorization code is invalid or expired.",
+      });
+  }
+
+  if (authCode.clientId !== serviceClient.clientId) {
+    return res
+      .status(400)
+      .json({
+        error: "invalid_grant",
+        error_description: "Authorization code does not match client.",
+      });
+  }
+
+  const expectedRedirect = requestBody.data.redirect_uri ?? null;
+  if (expectedRedirect && expectedRedirect !== authCode.redirectUri) {
+    return res
+      .status(400)
+      .json({
+        error: "invalid_grant",
+        error_description: "Authorization code redirect URI mismatch.",
+      });
+  }
+
+  if (!serviceClient.redirectUris.includes(authCode.redirectUri)) {
+    return res
+      .status(400)
+      .json({
+        error: "invalid_grant",
+        error_description: "Authorization code redirect URI mismatch.",
+      });
+  }
+
+  const requestedScopes = sanitizeScopes(authCode.scopes);
   const invalidScopes = getInvalidScopes(requestedScopes);
   if (invalidScopes.length > 0) {
     return res
@@ -254,28 +252,8 @@ export default async function handler(
       });
   }
 
-  const subjectToken = requestBody.data.subject_token;
-  const subjectPayload = verifyJWT(subjectToken);
-  if (!subjectPayload) {
-    return res
-      .status(400)
-      .json({
-        error: "invalid_request",
-        error_description: "Invalid subject token.",
-      });
-  }
-
-  if (verifyOboJWT(subjectToken)) {
-    return res
-      .status(400)
-      .json({
-        error: "invalid_request",
-        error_description: "Subject token must not be an OBO token.",
-      });
-  }
-
   const subjectUser = await database.user.findFirst({
-    where: { id: subjectPayload.userId },
+    where: { id: authCode.userId },
   });
 
   if (!subjectUser) {

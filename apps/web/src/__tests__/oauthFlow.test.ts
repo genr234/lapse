@@ -10,6 +10,7 @@ setupEnvMock();
 let oauthAuthorize: (req: NextApiRequest, res: NextApiResponse) => Promise<void>;
 let oauthToken: (req: NextApiRequest, res: NextApiResponse) => Promise<void>;
 let generateJWT: (userId: string, email: string) => string;
+let generateOAuthCode: (userId: string, clientId: string, scopes: string[], redirectUri: string, ttlSeconds: number) => string;
 let hashServiceSecret: (secret: string) => string;
 
 function createRes() {
@@ -48,6 +49,7 @@ beforeEach(async () => {
 
   const authModule = await import("@/server/auth");
   generateJWT = authModule.generateJWT;
+  generateOAuthCode = authModule.generateOAuthCode;
   hashServiceSecret = authModule.hashServiceSecret;
 });
 
@@ -109,21 +111,28 @@ describe("oauth flow", () => {
       clientId: "svc_test2",
       clientSecretHash: hashServiceSecret("secret"),
       scopes: ["timelapse:read"],
+      redirectUris: ["https://example.com/callback"],
     };
 
     mockDatabase.serviceClient.findFirst.mockResolvedValue(client as never);
     mockDatabase.user.findFirst.mockResolvedValue(user as never);
     mockDatabase.serviceGrant.findFirst.mockResolvedValue(null as never);
 
-    const userToken = generateJWT(user.id, user.email);
+    const authCode = generateOAuthCode(
+      user.id,
+      client.clientId,
+      ["timelapse:read"],
+      client.redirectUris[0],
+      300,
+    );
 
     const tokenRes = createRes();
     const tokenReq = createReq({
       method: "POST",
       body: {
-        grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
-        subject_token: userToken,
-        subject_token_type: "urn:ietf:params:oauth:token-type:access_token",
+        grant_type: "authorization_code",
+        code: authCode,
+        redirect_uri: client.redirectUris[0],
       },
       headers: {
         authorization: `Basic ${Buffer.from(`${client.clientId}:secret`).toString("base64")}`,
@@ -243,6 +252,7 @@ describe("oauth flow", () => {
       clientId: "svc_test5",
       clientSecretHash: hashServiceSecret("secret"),
       scopes: ["timelapse:read"],
+      redirectUris: ["https://example.com/callback"],
     };
 
     const grant = {
@@ -254,16 +264,21 @@ describe("oauth flow", () => {
     mockDatabase.serviceClient.findFirst.mockResolvedValue(client as never);
     mockDatabase.serviceGrant.findFirst.mockResolvedValue(grant as never);
 
-    const userToken = generateJWT(user.id, user.email);
+    const authCode = generateOAuthCode(
+      user.id,
+      client.clientId,
+      ["timelapse:read", "timelapse:read"],
+      client.redirectUris[0],
+      300,
+    );
 
     const tokenRes = createRes();
     const tokenReq = createReq({
       method: "POST",
       body: {
-        grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
-        scope: "timelapse:read timelapse:read",
-        subject_token: userToken,
-        subject_token_type: "urn:ietf:params:oauth:token-type:access_token",
+        grant_type: "authorization_code",
+        code: authCode,
+        redirect_uri: client.redirectUris[0],
       },
       headers: {
         authorization: `Basic ${Buffer.from(`${client.clientId}:secret`).toString("base64")}`,
@@ -290,6 +305,7 @@ describe("oauth flow", () => {
       clientId: "svc_test6",
       clientSecretHash: hashServiceSecret("secret"),
       scopes: ["timelapse:read"],
+      redirectUris: ["https://example.com/callback"],
     };
 
     const grant = {
@@ -314,9 +330,9 @@ describe("oauth flow", () => {
     const tokenReq = createReq({
       method: "POST",
       body: {
-        grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
-        subject_token: oboToken,
-        subject_token_type: "urn:ietf:params:oauth:token-type:access_token",
+        grant_type: "authorization_code",
+        code: oboToken,
+        redirect_uri: client.redirectUris[0],
       },
       headers: {
         authorization: `Basic ${Buffer.from(`${client.clientId}:secret`).toString("base64")}`,
@@ -480,7 +496,7 @@ describe("oauth flow", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it("rejects overly long scope strings on token exchange", async () => {
+  it("rejects invalid scopes on token exchange", async () => {
     const user = {
       id: "oauth-user-10",
       email: "test10@example.com",
@@ -491,6 +507,7 @@ describe("oauth flow", () => {
       clientId: "svc_test10",
       clientSecretHash: hashServiceSecret("secret"),
       scopes: ["timelapse:read"],
+      redirectUris: ["https://example.com/callback"],
     };
 
     const grant = {
@@ -502,16 +519,21 @@ describe("oauth flow", () => {
     mockDatabase.serviceClient.findFirst.mockResolvedValue(client as never);
     mockDatabase.serviceGrant.findFirst.mockResolvedValue(grant as never);
 
-    const userToken = generateJWT(user.id, user.email);
+    const authCode = generateOAuthCode(
+      user.id,
+      client.clientId,
+      ["timelapse:read", "invalid:scope"],
+      client.redirectUris[0],
+      300,
+    );
 
     const tokenRes = createRes();
     const tokenReq = createReq({
       method: "POST",
       body: {
-        grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
-        scope: "x".repeat(600),
-        subject_token: userToken,
-        subject_token_type: "urn:ietf:params:oauth:token-type:access_token",
+        grant_type: "authorization_code",
+        code: authCode,
+        redirect_uri: client.redirectUris[0],
       },
       headers: {
         authorization: `Basic ${Buffer.from(`${client.clientId}:secret`).toString("base64")}`,

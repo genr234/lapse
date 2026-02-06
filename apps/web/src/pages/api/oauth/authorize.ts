@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { z } from "zod";
 
 import { database } from "@/server/db";
-import { generateOboJWT } from "@/server/auth";
+import { generateOAuthCode } from "@/server/auth";
 import { getRestAuthContext } from "@/server/auth";
 import { getAllOAuthScopes } from "@/shared/oauthScopes";
 
@@ -21,6 +21,8 @@ const ConsentSchema = z.object({
     consent: z.boolean()
 });
 
+const AUTH_CODE_TTL_SECONDS = 300;
+
 function normalizeScopes(input: string[] | undefined): string[] {
     if (!input)
         return [];
@@ -38,14 +40,14 @@ function buildRedirectUrl(redirectUri: string | null, fragment: Record<string, s
         return null;
 
     const url = new URL(redirectUri);
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(url.search);
 
     for (const [key, value] of Object.entries(fragment)) {
         if (value !== undefined)
             params.set(key, value);
     }
 
-    url.hash = params.toString();
+    url.search = params.toString();
     return url.toString();
 }
 
@@ -104,25 +106,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             if (existingScopes.length !== new Set(existingScopes).size)
                 return res.status(400).json({ ok: false, message: "Invalid stored grant scopes." });
 
-            const token = generateOboJWT(
+            const code = generateOAuthCode(
                 authContext.user.id,
-                authContext.user.email,
-                client.id,
+                client.clientId,
                 existingScopes,
-                900
+                redirectUri,
+                AUTH_CODE_TTL_SECONDS
             );
 
             const redirectUrl = buildRedirectUrl(redirectUri, {
-                access_token: token,
-                token_type: "Bearer",
-                expires_in: "900",
-                scope: existingScopes.join(" "),
+                code,
                 state: parsed.data.state
             });
 
             return res.status(200).json({
                 ok: true,
-                data: { redirectUrl, accessToken: token, grantId: existingGrant.id }
+                data: { redirectUrl, authorizationCode: code, grantId: existingGrant.id }
             });
         }
 
@@ -205,23 +204,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
         });
 
-        const token = generateOboJWT(
+        const code = generateOAuthCode(
             authContext.user.id,
-            authContext.user.email,
-            client.id,
+            client.clientId,
             normalizedScopes,
-            900
+            redirectUri,
+            AUTH_CODE_TTL_SECONDS
         );
 
         const redirectUrl = buildRedirectUrl(redirectUri, {
-            access_token: token,
-            token_type: "Bearer",
-            expires_in: "900",
-            scope: normalizedScopes.join(" "),
+            code,
             state: parsed.data.state
         });
 
-        return res.status(200).json({ ok: true, data: { redirectUrl, grantId: grant.id, accessToken: token } });
+        return res.status(200).json({ ok: true, data: { redirectUrl, grantId: grant.id, authorizationCode: code } });
     }
 
     return res.status(405).json({ ok: false, message: "Method not allowed." });

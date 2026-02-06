@@ -26,8 +26,19 @@ export interface OboJWTPayload {
     iss: string;
 }
 
+export interface OAuthCodePayload {
+    userId: string;
+    clientId: string;
+    scopes: string[];
+    redirectUri: string;
+    type: "oauth_code";
+    iat: number;
+    exp: number;
+}
+
 export const OBO_AUDIENCE = "lapse-rest";
 export const OBO_ISSUER = "lapse";
+const OAUTH_CODE_TYPE = "oauth_code";
 
 export function generateJWT(userId: string, email: string): string {
     return jwt.sign({ userId, email }, env.JWT_SECRET, { expiresIn: "30d" });
@@ -48,6 +59,26 @@ export function generateOboJWT(
             scopes,
             aud: OBO_AUDIENCE,
             iss: OBO_ISSUER,
+        },
+        env.JWT_SECRET,
+        { expiresIn: ttlSeconds }
+    );
+}
+
+export function generateOAuthCode(
+    userId: string,
+    clientId: string,
+    scopes: string[],
+    redirectUri: string,
+    ttlSeconds: number,
+): string {
+    return jwt.sign(
+        {
+            type: OAUTH_CODE_TYPE,
+            userId,
+            clientId,
+            scopes,
+            redirectUri,
         },
         env.JWT_SECRET,
         { expiresIn: ttlSeconds }
@@ -91,6 +122,38 @@ export function verifyOboJWT(token: string): OboJWTPayload | null {
             scopes,
         };
     } catch {
+        return null;
+    }
+}
+
+export function verifyOAuthCode(token: string): OAuthCodePayload | null {
+    try {
+        const decoded = jwt.verify(token, env.JWT_SECRET) as jwt.JwtPayload;
+
+        const payload = decoded as OAuthCodePayload;
+        if (payload.type !== OAUTH_CODE_TYPE)
+            return null;
+
+        if (!payload.clientId || !payload.userId || !payload.redirectUri || !payload.scopes)
+            return null;
+
+        if (!Array.isArray(payload.scopes))
+            return null;
+
+        const scopes = payload.scopes
+            .filter((scope): scope is string => typeof scope === "string")
+            .map((scope) => scope.trim())
+            .filter(Boolean);
+
+        if (scopes.length === 0 || scopes.length !== new Set(scopes).size)
+            return null;
+
+        return {
+            ...payload,
+            scopes,
+        };
+    }
+    catch {
         return null;
     }
 }

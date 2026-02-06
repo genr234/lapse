@@ -44,7 +44,7 @@ export function buildRestOpenApiSpec() {
             "/api/oauth/token": {
                 post: {
                     operationId: "oauth.token",
-                    summary: "OAuth2 token exchange (RFC 8693)",
+                    summary: "OAuth2 authorization code exchange",
                     tags: ["oauth"],
                     requestBody: {
                         required: true,

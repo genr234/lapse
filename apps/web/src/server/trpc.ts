@@ -60,6 +60,7 @@ export function protectedProcedure(
 ) {
     const authedProc = t.procedure.use(async (opts) => {
         const { ctx } = opts;
+        const scopes = ctx.scopes ?? [];
 
         if (!ctx.user)
             throw new TRPCError({
@@ -67,8 +68,8 @@ export function protectedProcedure(
                 message: "Authentication required",
             });
 
-        if (requiredScopes.length > 0 && ctx.scopes.length > 0) {
-            const missingScopes = requiredScopes.filter(scope => !ctx.scopes.includes(scope));
+        if (requiredScopes.length > 0 && scopes.length > 0) {
+            const missingScopes = requiredScopes.filter(scope => !scopes.includes(scope));
             if (missingScopes.length > 0) {
                 throw new TRPCError({
                     code: "FORBIDDEN",
@@ -77,7 +78,7 @@ export function protectedProcedure(
             }
         }
 
-        return opts.next({ ctx: { ...ctx, user: ctx.user } });
+        return opts.next({ ctx: { ...ctx, scopes, user: ctx.user } });
     });
 
     return {
