@@ -317,7 +317,7 @@ export default router({
             return apiOk({ timelapse });
         }),
 
-    createDraft: protectedProcedure("POST", "/timelapse/createDraft")
+    createDraft: protectedProcedure(["timelapse:write"], "POST", "/timelapse/createDraft")
         .summary(`
             Creates a draft timelapse. Draft timelapses can be commited and turned into regular timelapses by calling "timelapse.commit".
             Before a draft timelapse is commited, all AES-256-CBC encrypted data must be uploaded to the server using both the "videoToken"
@@ -371,7 +371,7 @@ export default router({
             return apiOk({ id: draft.id, videoToken: video.id, thumbnailToken: thumbnail.id });
         }),
 
-    commit: protectedProcedure("POST", "/timelapse/commit")
+    commit: protectedProcedure(["timelapse:write"], "POST", "/timelapse/commit")
         .summary("Commits a draft timelapse.")
         .input(
             z.object({
@@ -464,7 +464,7 @@ export default router({
             return apiOk({ timelapse: dtoOwnedTimelapse(timelapse) });
         }),
 
-    update: protectedProcedure("PATCH", "/timelapse/update")
+    update: protectedProcedure(["timelapse:write"], "PATCH", "/timelapse/update")
         .summary("Updates the metadata of a timelapse.")
         .input(
             z.object({
@@ -524,7 +524,7 @@ export default router({
             return apiOk({ timelapse: dtoOwnedTimelapse(updatedTimelapse) });
         }),
 
-    delete: protectedProcedure("DELETE", "/timelapse/delete")
+    delete: protectedProcedure(["timelapse:write"], "DELETE", "/timelapse/delete")
         .summary("Permanently deletes a timelapse owned by the user.")
         .input(
             z.object({
@@ -545,7 +545,7 @@ export default router({
             }
         }),
 
-    publish: protectedProcedure("POST", "/timelapse/publish")
+    publish: protectedProcedure(["timelapse:write"], "POST", "/timelapse/publish")
         .summary("Publishes a timelapse, making it immutable and accessible by administrators. This will decrypt all of the segments contained within the timelapse. If not unlisted, will also make the timelapse public.")
         .input(
             z.object({
@@ -692,7 +692,7 @@ export default router({
             return apiOk({ timelapses: timelapses.map(x => dtoTimelapse(x, req.ctx.user)) });
         }),
 
-    syncWithHackatime: protectedProcedure("POST", "/timelapse/syncWithHackatime")
+    syncWithHackatime: protectedProcedure(["timelapse:write"], "POST", "/timelapse/syncWithHackatime")
         .summary("Synchronizes a timelapse with a Hackatime project, converting all snapshots into heartbeats. This procedure can only be called once for a timelapse.")
         .input(
             z.object({

@@ -6,27 +6,32 @@ import { z, ZodError } from "zod";
 import { OpenApiMeta, OpenApiMethod } from "trpc-to-openapi";
 
 import { getAuthenticatedUser } from "@/server/auth";
+import { OAuthScope } from "@/shared/oauthScopes";
 
-import type { User } from "@/generated/prisma/client";
+import type { ServiceClient, User } from "@/generated/prisma/client";
 
 export interface Context {
-  req: NextApiRequest;
-  res: NextApiResponse;
-  user: User | null;
+    req: NextApiRequest;
+    res: NextApiResponse;
+    user: User | null;
+    scopes: string[];
+    actor: ServiceClient | null;
 }
 
 export interface ProtectedContext extends Context {
-  user: User;
+    user: User;
 }
 
 export async function createContext(opts: { req: NextApiRequest; res: NextApiResponse }): Promise<Context> {
-  const user = await getAuthenticatedUser(opts.req);
+    const user = await getAuthenticatedUser(opts.req);
 
-  return {
-    req: opts.req,
-    res: opts.res,
-    user,
-  };
+    return {
+        req: opts.req,
+        res: opts.res,
+        user,
+        scopes: [],
+        actor: null,
+    };
 }
 
 const t = initTRPC.context<Context>().meta<OpenApiMeta>().create({
@@ -48,28 +53,41 @@ export const procedure = t.procedure;
  * Defines a tRPC procedure that requires the user to be authenticated, also associating OpenAPI metadata with the procedure.
  * The procedure then needs to be given documentation via `.summary(...)`.
  */
-export function protectedProcedure(method?: OpenApiMethod, path?: `/${string}`) {
-  const authedProc = t.procedure.use(async (opts) => {
-    const { ctx } = opts;
-    
-    if (!ctx.user) {
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "Authentication required",
-      });
-    }
-    
-    return opts.next({ ctx: {...ctx, user: ctx.user } });
-  });
+export function protectedProcedure(
+    requiredScopes: OAuthScope[] = [],
+    method?: OpenApiMethod,
+    path?: `/${string}`
+) {
+    const authedProc = t.procedure.use(async (opts) => {
+        const { ctx } = opts;
 
-  return {
-    summary(summary: string) {
-      if (method && path)
-        return authedProc.meta({ openapi: { method, path, summary, protect: true } });
+        if (!ctx.user)
+            throw new TRPCError({
+                code: "UNAUTHORIZED",
+                message: "Authentication required",
+            });
 
-      return authedProc;
-    }
-  };
+        if (requiredScopes.length > 0 && ctx.scopes.length > 0) {
+            const missingScopes = requiredScopes.filter(scope => !ctx.scopes.includes(scope));
+            if (missingScopes.length > 0) {
+                throw new TRPCError({
+                    code: "FORBIDDEN",
+                    message: "Missing required OAuth scope",
+                });
+            }
+        }
+
+        return opts.next({ ctx: { ...ctx, user: ctx.user } });
+    });
+
+    return {
+        summary(summary: string) {
+            if (method && path)
+                return authedProc.meta({ openapi: { method, path, summary, protect: true } });
+
+            return authedProc;
+        }
+    };
 }
 
 /**

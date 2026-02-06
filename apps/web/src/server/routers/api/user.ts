@@ -252,7 +252,7 @@ export default router({
             return apiOk({ user });
         }),
 
-    update: protectedProcedure("PATCH", "/user/update")
+    update: protectedProcedure(["user:write"], "PATCH", "/user/update")
         .summary("Updates user profile information.")
         .input(
             z.object({
@@ -298,7 +298,7 @@ export default router({
             return apiOk({ user: dtoUser(updatedUser) });
         }),
 
-    getDevices: protectedProcedure("GET", "/user/getDevices")
+    getDevices: protectedProcedure(["user:read"], "GET", "/user/getDevices")
         .summary("Gets all devices registered by the currently authenticated user.")
         .input(z.object({}))
         .output(
@@ -316,7 +316,7 @@ export default router({
             return apiOk({ devices: devices.map(dtoKnownDevice) });
         }),
 
-    registerDevice: protectedProcedure("POST", "/user/registerDevice")
+    registerDevice: protectedProcedure(["user:write"], "POST", "/user/registerDevice")
         .summary("Creates a new device owned by a user, allocating a new, unique ID.")
         .input(
             z.object({
@@ -342,7 +342,7 @@ export default router({
             return apiOk({ device: dtoKnownDevice(device) });
         }),
 
-    removeDevice: protectedProcedure("DELETE", "/user/removeDevice")
+    removeDevice: protectedProcedure(["user:write"], "DELETE", "/user/removeDevice")
         .summary("Removes a device owned by a user.")
         .input(
             z.object({
@@ -398,7 +398,7 @@ export default router({
             return apiOk({});
         }),
 
-    hackatimeProjects: protectedProcedure("GET", "/user/hackatimeProjects")
+    hackatimeProjects: protectedProcedure(["user:read"], "GET", "/user/hackatimeProjects")
         .summary("Gets a list of Hackatime projects that have been associated with the user's timelapses, including the total hour counts.")
         .input(z.object({}))
         .output(apiResult({
@@ -469,7 +469,7 @@ export default router({
             return apiOk({ time: aggregate._sum.duration ?? 0 });
         }),
 
-    emitHeartbeat: protectedProcedure("POST", "/user/emitHeartbeat")
+    emitHeartbeat: protectedProcedure(["user:write"], "POST", "/user/emitHeartbeat")
         .summary("Updates the last heartbeat time of the calling user to the current date. This is used to detect active users.")
         .input(z.object({}))
         .output(apiResult({}))

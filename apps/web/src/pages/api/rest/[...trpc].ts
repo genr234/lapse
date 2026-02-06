@@ -9,7 +9,13 @@ export default createOpenApiNextHandler({
 
     async createContext({ req, res }) {
         const authContext = await getRestAuthContext(req);
-        return { req, res, user: authContext.user };
+        return {
+            req,
+            res,
+            user: authContext.user,
+            scopes: authContext.scopes,
+            actor: authContext.actor,
+        };
     },
 
     onError({ error }) {

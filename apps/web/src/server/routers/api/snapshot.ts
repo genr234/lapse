@@ -50,7 +50,7 @@ export const SnapshotSchema = z.object({
 });
 
 export default router({
-    delete: protectedProcedure("DELETE", "/snapshot/delete")
+    delete: protectedProcedure(["snapshot:write"], "DELETE", "/snapshot/delete")
         .summary("Deletes a snapshot.")
         .input(
             z.object({

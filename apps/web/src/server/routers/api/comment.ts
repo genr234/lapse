@@ -54,7 +54,7 @@ export function dtoComment(comment: DbComment): Comment {
 }
 
 export default router({
-    create: protectedProcedure("POST", "/comment/create")
+    create: protectedProcedure(["comment:write"], "POST", "/comment/create")
         .summary("Creates a new comment for the given timelapse.")
         .input(
             z.object({
@@ -92,7 +92,7 @@ export default router({
             return apiOk({ comment: dtoComment(comment) });
         }),
 
-    delete: protectedProcedure("DELETE", "/comment/delete")
+    delete: protectedProcedure(["comment:write"], "DELETE", "/comment/delete")
         .summary("Deletes a comment owned by the calling user.")
         .input(
             z.object({

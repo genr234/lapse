@@ -11,7 +11,7 @@ import { logTracing } from "@/server/serverCommon";
 // Some of the endpoints in this router will be removed after the beta period ends.
 
 export default router({
-    traceEncodeStart: protectedProcedure()
+    traceEncodeStart: protectedProcedure(["global:read"])
         .summary("Provides the server with client-side information about a local video encoding job.")
         .input(
             z.object({

@@ -1,3 +1,5 @@
+import { FlattenUnion } from "@/shared/common";
+
 export const OAUTH_SCOPE_GROUPS = {
   Timelapses: {
     "timelapse:read": "View your timelapses",
@@ -14,13 +16,10 @@ export const OAUTH_SCOPE_GROUPS = {
   },
 } as const;
 
-export type OAuthScope =
-  keyof (typeof OAUTH_SCOPE_GROUPS)[keyof typeof OAUTH_SCOPE_GROUPS];
+export type OAuthScope = keyof FlattenUnion<(typeof OAUTH_SCOPE_GROUPS)[keyof typeof OAUTH_SCOPE_GROUPS]>;
 
-export function getAllOAuthScopes(): string[] {
-  return Object.values(OAUTH_SCOPE_GROUPS).flatMap((group) =>
-    Object.keys(group),
-  );
+export function getAllOAuthScopes() {
+  return Object.values(OAUTH_SCOPE_GROUPS).flatMap((group) => Object.keys(group));
 }
 
 export function getScopeDescriptions() {

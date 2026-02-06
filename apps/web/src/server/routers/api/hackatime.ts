@@ -20,7 +20,7 @@ export const HackatimeProjectSchema = z.object({
 });
 
 export default router({
-    allProjects: protectedProcedure()
+    allProjects: protectedProcedure(["user:read"])
         .summary("Gets all Hackatime projects from the user's Hackatime account.")
         .input(z.object({}))
         .output(apiResult({
