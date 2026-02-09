@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { Button } from "@/client/components/ui/Button";
 import { useAuth } from "@/client/hooks/useAuth";
 import { OAUTH_SCOPE_GROUPS } from "@/shared/oauthScopes";
+import { trpc } from "@/client/trpc";
 
 import { WindowedModal } from "@/client/components/ui/WindowedModal";
 
@@ -49,15 +50,14 @@ export function OAuthGrantsView({ isOpen, setIsOpen }: {
       setError(null);
 
       try {
-        const response = await fetch("/api/oauth/grants");
-        const data = await response.json();
+        const res = await trpc.developer.getOwnedOAuthGrants.query({});
 
-        if (!response.ok || !data.ok) {
-          setError(data?.message ?? "Unable to load grants.");
+        if (!res.ok) {
+          setError(res.message ?? "Unable to load grants.");
           return;
         }
 
-        setGrants(data.data.grants);
+        setGrants(res.data.grants);
       }
       catch (err) {
         console.error("(OAuthGrantsView) failed to load grants", err);
@@ -74,19 +74,14 @@ export function OAuthGrantsView({ isOpen, setIsOpen }: {
     setError(null);
 
     try {
-      const response = await fetch("/api/oauth/grants", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ grantId })
-      });
+      const result = await trpc.developer.revokeOAuthGrant.mutate({ grantId });
 
-      const data = await response.json();
-      if (!response.ok || !data.ok) {
-        setError(data?.message ?? "Unable to revoke grant.");
-        return;
+      if (result.ok) {
+        setGrants(grants.filter(grant => grant.id !== grantId));
       }
-
-      setGrants(grants.filter(grant => grant.id !== grantId));
+      else {
+        setError(result.message ?? "Unable to revoke grant.");
+      }
     }
     catch (err) {
       console.error("(OAuthGrantsView) failed to revoke", err);

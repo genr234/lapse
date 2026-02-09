@@ -27,6 +27,7 @@ export async function createServiceClient(params: {
     const clientSecret = generateServiceClientSecret();
 
     const client = await database.serviceClient.create({
+        include: { createdByUser: true },
         data: {
             name: params.name,
             description: params.description,

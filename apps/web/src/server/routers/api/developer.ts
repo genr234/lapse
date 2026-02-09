@@ -2,7 +2,7 @@ import "@/server/allow-only-server";
 
 import { z } from "zod";
 
-import { router, protectedProcedure } from "@/server/trpc";
+import { router, protectedProcedure, adminProcedure } from "@/server/trpc";
 import { database } from "@/server/db";
 import { normalizeRedirectUris, normalizeScopes, rotateServiceClientSecret, createServiceClient } from "@/server/services/serviceClientService";
 
@@ -24,12 +24,18 @@ export const OAuthAppSchema = z.object({
     redirectUris: z.array(z.url()),
     scopes: z.array(z.string()),
     trustLevel: OAuthTrustLevelSchema,
-    clientId: z.string()
+    clientId: z.string(),
+    createdBy: z.object({
+        id: z.string(),
+        handle: z.string(),
+        displayName: z.string()
+    }),
+    createdAt: z.string()
 });
 
 export const OAuthAppIdSchema = OAuthAppSchema.shape.id;
 
-export type DbOAuthApp = db.ServiceClient;
+export type DbOAuthApp = db.ServiceClient & { createdByUser: db.User };
 
 export function dtoOAuthApp(entity: DbOAuthApp): OAuthApp {
     return {
@@ -41,7 +47,35 @@ export function dtoOAuthApp(entity: DbOAuthApp): OAuthApp {
         redirectUris: entity.redirectUris,
         scopes: entity.scopes,
         trustLevel: entity.trustLevel,
-        clientId: entity.clientId
+        clientId: entity.clientId,
+        createdBy: {
+            id: entity.createdByUser.id,
+            handle: entity.createdByUser.handle,
+            displayName: entity.createdByUser.displayName
+        },
+        createdAt: entity.createdAt.toISOString()
+    };
+}
+
+export type OAuthGrant = {
+    id: string;
+    serviceClientId: string;
+    serviceName: string;
+    scopes: string[];
+    createdAt: string;
+    lastUsedAt: string | null;
+};
+
+export type DbOAuthGrant = db.ServiceGrant & { serviceClient: db.ServiceClient };
+
+export function dtoOAuthGrant(entity: DbOAuthGrant): OAuthGrant {
+    return {
+        id: entity.id,
+        serviceClientId: entity.serviceClientId,
+        serviceName: entity.serviceClient.name,
+        scopes: entity.scopes,
+        createdAt: entity.createdAt.toISOString(),
+        lastUsedAt: entity.lastUsedAt?.toISOString() ?? null
     };
 }
 
@@ -128,6 +162,7 @@ export default router({
     
             const updated = await database.serviceClient.update({
                 where: { id: app.id },
+                include: { createdByUser: true },
                 data: {
                     name: req.input.name,
                     description: req.input.description,
@@ -175,7 +210,8 @@ export default router({
         .query(async (req) => {
             const apps = await database.serviceClient.findMany({
                 where: { createdByUserId: req.ctx.user.id, revokedAt: null },
-                orderBy: { createdAt: "desc" }
+                orderBy: { createdAt: "desc" },
+                include: { createdByUser: true },
             });
 
             return apiOk({ apps: apps.map(dtoOAuthApp) });
@@ -222,5 +258,106 @@ export default router({
             });
 
             return apiOk({ app: dtoOAuthApp(client), clientSecret });
+        }),
+
+    getAllApps: adminProcedure()
+        .summary("Gets all OAuth apps created by any user. This procedure requires administrator access.")
+        .input(z.object({}))
+        .output(apiResult({
+            apps: z.array(OAuthAppSchema)
+        }))
+        .query(async (req) => {
+            const apps = await database.serviceClient.findMany({
+                include: { createdByUser: true },
+                orderBy: { createdAt: "desc" },
+                where: { revokedAt: null }
+            });
+
+            return apiOk({
+                apps: apps.map(dtoOAuthApp)
+            });
+        }),
+
+    updateAppTrustLevel: adminProcedure()
+        .summary("Updates the trust level of an OAuth app. This procedure requires administrator access.")
+        .input(
+            z.object({
+                id: OAuthAppIdSchema
+                    .describe("The app ID to update."),
+                    
+                trustLevel: OAuthTrustLevelSchema
+                    .describe("The new trust level.")
+            })
+        )
+        .output(apiResult({
+            trustLevel: OAuthTrustLevelSchema
+        }))
+        .mutation(async (req) => {
+            const app = await database.serviceClient.findUnique({
+                where: { id: req.input.id }
+            });
+
+            if (!app)
+                return apiErr("NOT_FOUND", `App with ID ${req.input.id} not found.`);
+
+            const updated = await database.serviceClient.update({
+                where: { id: req.input.id },
+                data: { trustLevel: req.input.trustLevel }
+            });
+
+            return apiOk({ trustLevel: updated.trustLevel });
+        }),
+
+    getOwnedOAuthGrants: protectedProcedure()
+        .summary("Gets all OAuth grants for the authenticated user.")
+        .input(z.object({}))
+        .output(apiResult({
+            grants: z.array(z.object({
+                id: z.string(),
+                serviceClientId: z.string(),
+                serviceName: z.string(),
+                scopes: z.array(z.string()),
+                createdAt: z.string(),
+                lastUsedAt: z.string().nullable()
+            }))
+        }))
+        .query(async (req) => {
+            const grants = await database.serviceGrant.findMany({
+                include: { serviceClient: true },
+                where: { userId: req.ctx.user.id, revokedAt: null },
+                orderBy: { createdAt: "desc" }
+            });
+
+            return apiOk({
+                grants: grants.map(dtoOAuthGrant)
+            });
+        }),
+
+    revokeOAuthGrant: protectedProcedure()
+        .summary("Revokes an OAuth grant for the authenticated user.")
+        .input(
+            z.object({
+                grantId: z.string()
+                    .describe("The ID of the grant to revoke.")
+            })
+        )
+        .output(apiResult({}))
+        .mutation(async (req) => {
+            const grant = await database.serviceGrant.findUnique({
+                where: { id: req.input.grantId }
+            });
+
+            if (!grant)
+                return apiErr("NOT_FOUND", `Grant with ID ${req.input.grantId} not found.`);
+
+            if (grant.userId !== req.ctx.user.id)
+                return apiErr("NO_PERMISSION", "You do not have permission to revoke this grant.");
+
+            await database.serviceGrant.update({
+                where: { id: req.input.grantId },
+                data: { revokedAt: new Date() }
+            });
+
+            return apiOk({});
         })
     });

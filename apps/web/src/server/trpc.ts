@@ -15,7 +15,6 @@ export interface Context {
     res: NextApiResponse;
     user: User | null;
     scopes: string[];
-    actor: ServiceClient | null;
 }
 
 export interface ProtectedContext extends Context {
@@ -29,8 +28,7 @@ export async function createContext(opts: { req: NextApiRequest; res: NextApiRes
         req: opts.req,
         res: opts.res,
         user,
-        scopes: [],
-        actor: null,
+        scopes: []
     };
 }
 
@@ -104,4 +102,42 @@ export function publicProcedure(method?: OpenApiMethod, path?: `/${string}`) {
       return procedure;
     }
   };
+}
+
+/**
+ * Defines a tRPC procedure that requires the user to be an admin, also associating OpenAPI metadata with the procedure.
+ * The procedure then needs to be given documentation via `.summary(...)`.
+ */
+export function adminProcedure(
+    method?: OpenApiMethod,
+    path?: `/${string}`
+) {
+    const adminProc = t.procedure.use(async (opts) => {
+        const { ctx } = opts;
+
+        if (!ctx.user) {
+            throw new TRPCError({
+                code: "UNAUTHORIZED",
+                message: "Authentication required",
+            });
+        }
+
+        if (ctx.user.permissionLevel !== "ADMIN" && ctx.user.permissionLevel !== "ROOT") {
+            throw new TRPCError({
+                code: "FORBIDDEN",
+                message: "Admin access required",
+            });
+        }
+
+        return opts.next({ ctx: { ...ctx, user: ctx.user } });
+    });
+
+    return {
+        summary(summary: string) {
+            if (method && path)
+                return adminProc.meta({ openapi: { method, path, summary, protect: true } });
+
+            return adminProc;
+        }
+    };
 }

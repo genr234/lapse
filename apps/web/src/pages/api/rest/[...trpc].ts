@@ -13,8 +13,7 @@ export default createOpenApiNextHandler({
             req,
             res,
             user: authContext.user,
-            scopes: authContext.scopes,
-            actor: authContext.actor,
+            scopes: authContext.scopes
         };
     },
 

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import RootLayout from "@/client/components/RootLayout";
 import { Button } from "@/client/components/ui/Button";
 import { useAuth } from "@/client/hooks/useAuth";
+import { trpc } from "@/client/trpc";
 
 type AdminApp = {
   id: string
@@ -26,50 +27,60 @@ export default function AdminApps() {
   const auth = useAuth(true);
   const [apps, setApps] = useState<AdminApp[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     if (!auth.currentUser)
       return;
 
     (async () => {
-      try {
-        const response = await fetch("/api/admin/apps");
-        const data = await response.json();
+      setIsLoading(true);
+      setError(null);
 
-        if (!response.ok || !data.ok) {
-          setError(data?.message ?? "Unable to load apps.");
+      try {
+        const res = await trpc.developer.getAllAppsAsAdmin.query({});
+
+        if (!res.ok) {
+          setError(res.message ?? "Unable to load apps.");
           return;
         }
 
-        setApps(data.data.apps);
+        setApps(res.data.apps);
       }
       catch (err) {
         console.error("(admin/apps) failed to load", err);
         setError("Unable to load apps.");
       }
+      finally {
+        setIsLoading(false);
+      }
     })();
   }, [auth.currentUser]);
 
   async function updateTrust(appId: string, trustLevel: "UNTRUSTED" | "TRUSTED") {
+    setIsUpdating(true);
+    setError(null);
+
     try {
-      const response = await fetch(`/api/admin/apps/${appId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trustLevel })
+      const res = await trpc.developer.updateAppTrustLevel.mutate({
+        id: appId,
+        trustLevel
       });
-      
-      const data = await response.json();
 
-      if (!response.ok || !data.ok) {
-        setError(data?.message ?? "Unable to update trust.");
-        return;
+      if (res.ok) {
+        setApps(apps.map(app => app.id === appId ? { ...app, trustLevel: res.data.trustLevel } : app));
       }
-
-      setApps(apps.map(app => app.id === appId ? { ...app, trustLevel: data.data.trustLevel } : app));
+      else {
+        setError(res.message ?? "Unable to update trust.");
+      }
     }
     catch (err) {
       console.error("(admin/apps) failed to update", err);
       setError("Unable to update trust.");
+    }
+    finally {
+      setIsUpdating(false);
     }
   }
 
@@ -83,6 +94,8 @@ export default function AdminApps() {
 
         {error && <div className="text-red-400">{error}</div>}
 
+        {isLoading && <div className="text-muted">Loading apps...</div>}
+
         <div className="flex flex-col gap-4">
           {apps.map(app => (
             <div key={app.id} className="rounded-2xl border border-slate bg-dark p-4 flex flex-col gap-3">
@@ -94,8 +107,8 @@ export default function AdminApps() {
               </div>
 
               <div className="flex gap-3">
-                <Button kind="regular" onClick={() => updateTrust(app.id, "UNTRUSTED")}>Mark Untrusted</Button>
-                <Button kind="primary" onClick={() => updateTrust(app.id, "TRUSTED")}>Mark Trusted</Button>
+                <Button kind="regular" onClick={() => updateTrust(app.id, "UNTRUSTED")} disabled={isUpdating}>Mark Untrusted</Button>
+                <Button kind="primary" onClick={() => updateTrust(app.id, "TRUSTED")} disabled={isUpdating}>Mark Trusted</Button>
               </div>
             </div>
           ))}
