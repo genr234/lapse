@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
+import Icon from "@hackclub/icons";
 
-import RootLayout from "@/client/components/RootLayout";
+import { OAuthApp } from "@/client/api";
+import { trpc } from "@/client/trpc";
+import { useAuth } from "@/client/hooks/useAuth";
 import { Button } from "@/client/components/ui/Button";
 import { WindowedModal } from "@/client/components/ui/WindowedModal";
-import { useAuth } from "@/client/hooks/useAuth";
+import RootLayout from "@/client/components/RootLayout";
+
 import { OAUTH_SCOPE_GROUPS } from "@/shared/oauthScopes";
-import Icon from "@hackclub/icons";
 
 const scopeEntries = Object.entries(OAUTH_SCOPE_GROUPS).flatMap(
   ([group, scopes]) =>
@@ -16,19 +19,7 @@ const scopeEntries = Object.entries(OAUTH_SCOPE_GROUPS).flatMap(
     })),
 );
 
-type DeveloperApp = {
-  id: string;
-  name: string;
-  description: string;
-  homepageUrl: string;
-  iconUrl: string;
-  clientId: string;
-  scopes: string[];
-  redirectUris: string[];
-  trustLevel: "UNTRUSTED" | "TRUSTED";
-};
-
-function buildAuthorizeTestUrl(app: DeveloperApp) {
+function buildAuthorizeTestUrl(app: OAuthApp) {
   const redirectUri = app.redirectUris[0];
   if (!redirectUri)
     return null;
@@ -47,7 +38,7 @@ function buildAuthorizeTestUrl(app: DeveloperApp) {
 
 export default function DeveloperApps() {
   const auth = useAuth(true);
-  const [apps, setApps] = useState<DeveloperApp[]>([]);
+  const [apps, setApps] = useState<OAuthApp[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [formState, setFormState] = useState({
@@ -77,15 +68,14 @@ export default function DeveloperApps() {
       setError(null);
 
       try {
-        const response = await fetch("/api/developer/apps");
-        const data = await response.json();
+        const res = await trpc.developer.getAllOwnedApps.query({});
 
-        if (!response.ok || !data.ok) {
-          setError(data?.message ?? "Unable to load apps.");
+        if (!res.ok) {
+          setError(`Unable to load apps: ${res.message}`);
           return;
         }
 
-        setApps(data.data.apps);
+        setApps(res.data.apps);
       }
       catch (err) {
         console.error("(developer/apps) failed to load", err);
@@ -110,29 +100,24 @@ export default function DeveloperApps() {
     setSecretResult(null);
 
     try {
-      const response = await fetch("/api/developer/apps", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formState.name,
-          description: formState.description,
-          homepageUrl: formState.homepageUrl,
-          iconUrl: formState.iconUrl,
-          redirectUris: modalRedirectUris,
-          scopes: formState.scopes,
-        }),
+      const res = await trpc.developer.createApp.mutate({
+        name: formState.name,
+        description: formState.description,
+        homepageUrl: formState.homepageUrl,
+        iconUrl: formState.iconUrl,
+        redirectUris: modalRedirectUris,
+        scopes: formState.scopes
       });
 
-      const data = await response.json();
-      if (!response.ok || !data.ok) {
-        setError(data?.message ?? "Unable to create app.");
+      if (!res.ok) {
+        setError(`Unable to create app: ${res.message}`);
         return;
       }
 
-      setApps([data.data.app, ...apps]);
+      setApps([res.data.app, ...apps]);
       setSecretResult({
-        clientId: data.data.app.clientId,
-        clientSecret: data.data.clientSecret,
+        clientId: res.data.app.clientId,
+        clientSecret: res.data.clientSecret,
       });
 
       setFormState({
@@ -156,14 +141,9 @@ export default function DeveloperApps() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/developer/apps/${appId}`, {
-        method: "DELETE",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.ok) {
-        setError(data?.message ?? "Unable to delete app.");
+      const res = await trpc.developer.revokeApp.mutate({ id: appId });
+      if (!res.ok) {
+        setError(`Unable to delete app: ${res.message}`);
         return;
       }
 
@@ -190,15 +170,10 @@ export default function DeveloperApps() {
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/developer/apps/${appId}/rotate-secret`,
-        { method: "POST" }
-      );
+      const res = await trpc.developer.rotateAppSecret.mutate({ id: appId });
 
-      const data = await response.json();
-
-      if (!response.ok || !data.ok) {
-        setError(data?.message ?? "Unable to rotate secret.");
+      if (!res.ok) {
+        setError(`Unable to rotate secret: ${res.message}`);
         return;
       }
 
@@ -208,7 +183,7 @@ export default function DeveloperApps() {
 
       setSecretResult({
         clientId: app.clientId,
-        clientSecret: data.data.clientSecret,
+        clientSecret: res.data.clientSecret,
       });
 
       setRotateSecretId(null);
@@ -223,7 +198,7 @@ export default function DeveloperApps() {
     setRotateSecretId(appId);
   }
 
-  function beginEdit(app: DeveloperApp) {
+  function beginEdit(app: OAuthApp) {
     setAppModalMode("edit");
     setAppModalId(app.id);
     setFormState({
@@ -252,26 +227,22 @@ export default function DeveloperApps() {
     setSaveNotice(null);
 
     try {
-      const response = await fetch(`/api/developer/apps/${appModalId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formState.name,
-          description: formState.description,
-          homepageUrl: formState.homepageUrl,
-          iconUrl: formState.iconUrl,
-          redirectUris: modalRedirectUris,
-          scopes: formState.scopes,
-        }),
+      const res = await trpc.developer.updateApp.mutate({
+        id: appModalId,
+        name: formState.name,
+        description: formState.description,
+        homepageUrl: formState.homepageUrl,
+        iconUrl: formState.iconUrl,
+        redirectUris: modalRedirectUris,
+        scopes: formState.scopes
       });
 
-      const data = await response.json();
-      if (!response.ok || !data.ok) {
-        setError(data?.message ?? "Unable to update app.");
+      if (!res.ok) {
+        setError(`Unable to update app: ${res.message}`);
         return;
       }
 
-      setApps(apps.map((app) => (app.id === appModalId ? data.data.app : app)));
+      setApps(apps.map(x => x.id === appModalId ? res.data.app : x));
       setSaveNotice("App updated. Existing authorizations remain active.");
       setAppModalOpen(false);
       setAppModalMode("create");
