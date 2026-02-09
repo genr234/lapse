@@ -206,6 +206,10 @@ export async function getAuthenticatedUser(req: NextApiRequest) {
     if (!token)
         return null;
 
+    // Reject OAuth tokens in tRPC - only regular user sessions allowed
+    if (hasOboClaims(token))
+        return null;
+
     const payload = verifyJWT(token);
     if (!payload)
         return null;
