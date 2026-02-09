@@ -269,8 +269,7 @@ export default router({
         .query(async (req) => {
             const apps = await database.serviceClient.findMany({
                 include: { createdByUser: true },
-                orderBy: { createdAt: "desc" },
-                where: { revokedAt: null }
+                orderBy: { createdAt: "desc" }
             });
 
             return apiOk({
@@ -279,34 +278,42 @@ export default router({
         }),
 
     updateAppTrustLevel: adminProcedure()
-        .summary("Updates the trust level of an OAuth app. This procedure requires administrator access.")
-        .input(
-            z.object({
-                id: OAuthAppIdSchema
-                    .describe("The app ID to update."),
-                    
-                trustLevel: OAuthTrustLevelSchema
-                    .describe("The new trust level.")
-            })
-        )
-        .output(apiResult({
-            trustLevel: OAuthTrustLevelSchema
-        }))
-        .mutation(async (req) => {
+         .summary("Updates the trust level of an OAuth app. This procedure requires administrator access.")
+         .input(
+             z.object({
+                 id: OAuthAppIdSchema
+                     .describe("The app ID to update."),
+                     
+                 trustLevel: OAuthTrustLevelSchema
+                     .describe("The new trust level.")
+             })
+         )
+         .output(apiResult({
+             trustLevel: OAuthTrustLevelSchema
+         }))
+         .mutation(async (req) => {
             const app = await database.serviceClient.findUnique({
                 where: { id: req.input.id }
             });
-
+    
             if (!app)
                 return apiErr("NOT_FOUND", `App with ID ${req.input.id} not found.`);
-
+    
             const updated = await database.serviceClient.update({
                 where: { id: req.input.id },
                 data: { trustLevel: req.input.trustLevel }
             });
 
+             await database.serviceClientReview.create({
+                data: {
+                    serviceClientId: req.input.id,
+                    reviewedByUserId: req.ctx.user.id,
+                    status: req.input.trustLevel
+                }
+            });
+    
             return apiOk({ trustLevel: updated.trustLevel });
-        }),
+         }),
 
     getOwnedOAuthGrants: protectedProcedure()
         .summary("Gets all OAuth grants for the authenticated user.")

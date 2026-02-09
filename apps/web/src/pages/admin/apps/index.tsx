@@ -39,7 +39,7 @@ export default function AdminApps() {
       setError(null);
 
       try {
-        const res = await trpc.developer.getAllAppsAsAdmin.query({});
+        const res = await trpc.developer.getAllApps.query({});
 
         if (!res.ok) {
           setError(res.message ?? "Unable to load apps.");
